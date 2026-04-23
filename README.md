@@ -1,6 +1,6 @@
 # Xiaozhi firmware — ESP-BOX-3 preset fork
 
-This repository is a **standalone copy** of [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) with **saved defaults** for the **Espressif ESP-BOX-3** kit: board type, emote UI, official BOX-3 custom assets bundle, AFE wake word, audio processor, and **device-side AEC** (double-tap Boot to toggle when enabled in UI).
+This repository is a **standalone copy** of [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) with **saved defaults** for the **Espressif ESP-BOX-3** kit: default chat UI, **built-in assets** (so speech models match `sdkconfig`), **English Multinet** wake phrase **`grace`** (shown as **Grace** to the server), audio processor, and **device-side AEC**.
 
 Upstream application logic, board ports, and licenses are unchanged unless noted in git history.
 
@@ -16,26 +16,27 @@ File `sdkconfig.defaults.esp-box3-xiaozhi` is merged **after** `sdkconfig.defaul
 | Option | Purpose |
 |--------|---------|
 | `CONFIG_BOARD_TYPE_ESP_BOX_3` | BOX-3 pinout and drivers |
-| `CONFIG_USE_EMOTE_MESSAGE_STYLE` | Emote / expression display path |
-| `CONFIG_FLASH_CUSTOM_ASSETS` + `CONFIG_CUSTOM_ASSETS_FILE` | Official Espressif BOX-3 assets URL (downloaded at configure/build time) |
-| `CONFIG_USE_AFE_WAKE_WORD` | Wake word with AFE (fits BOX-3 + PSRAM) |
+| `CONFIG_USE_DEFAULT_MESSAGE_STYLE` | Standard chat UI (fits default generated assets) |
+| `CONFIG_FLASH_DEFAULT_ASSETS` | Build `generated_assets.bin` from `sdkconfig` (includes `index.json` + `srmodels.bin`) |
+| `CONFIG_SR_MN_EN_MULTINET7_QUANT` | English Multinet model (required for English wake phrase) |
+| `CONFIG_USE_CUSTOM_WAKE_WORD` + `CONFIG_CUSTOM_WAKE_WORD` / `_DISPLAY` | Phrase **`grace`**, display **Grace** (train users to say “grace” clearly; tweak threshold in menuconfig if needed) |
 | `CONFIG_USE_AUDIO_PROCESSOR` | Noise reduction pipeline |
 | `CONFIG_USE_DEVICE_AEC` | Device-side echo cancellation |
 
-Use `idf.py menuconfig` to turn options on or off (e.g. default chat UI instead of emote, or hotspot vs BluFi provisioning).
+Use `idf.py menuconfig` to change the phrase, threshold, or switch back to **AFE / fixed Wakenet** (and optional Espressif BOX-3 custom asset URL) if you prefer the stock “你好小智” style wake word.
 
 ## Build and flash
 
 ```bash
 export IDF_PATH=/path/to/esp-idf   # v5.5.2+
 . $IDF_PATH/export.sh
-cd esp-box3-xiaozhi
+cd esp32-s3-box-3
 idf.py set-target esp32s3
 idf.py build
 idf.py -p PORT flash
 ```
 
-The first CMake run may **download** the custom assets `.bin` into `build/` for flashing to the assets partition.
+The build produces **`build/generated_assets.bin`** (fonts, emojis, `srmodels.bin`, etc.) and flashes it to the **assets** partition together with the app.
 
 Hardware-specific notes for BOX-3 and add-ons are in `main/boards/esp-box-3/README.md`.
 
