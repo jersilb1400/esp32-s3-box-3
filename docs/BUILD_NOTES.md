@@ -27,17 +27,36 @@ cd esp-idf-v5.5.2
 
 ## Every new terminal
 
+Fastest and safest — use the helper shipped in this repo:
+
 ```bash
+cd ~/esp-box3
+source scripts/use-idf-5.5.sh
+```
+
+The helper clears any leftover ESP-IDF env vars (important on this Mac
+because v6.0 is also installed) and then sources v5.5.2's `export.sh`.
+It prints `ESP-IDF ready: ESP-IDF v5.5.2` on success.
+
+Manual equivalent if you prefer:
+
+```bash
+unset IDF_PATH IDF_PYTHON_ENV_PATH IDF_TOOLS_EXPORT_CMD IDF_TOOLS_INSTALL_CMD
 export IDF_PATH="$HOME/esp-idf-v5.5.2"
-. "$IDF_PATH/export.sh"
+source "$IDF_PATH/export.sh"
 ```
 
 Verify:
 
 ```bash
 idf.py --version            # should show v5.5.2
-echo "$IDF_TARGET"          # optional; set-target writes sdkconfig
+which idf.py                # should be under ~/esp-idf-v5.5.2/tools
 ```
+
+> **Paste gotcha.** Do NOT paste the two lines `source "$IDF_PATH/export.sh"` and
+> `cd ~/esp-box3` joined together — some terminals drop the newline and you end
+> up trying to source a file literally named `export.shcd`. Run them as
+> separate lines or just use the helper above.
 
 ## Clean build for this project
 
@@ -57,7 +76,9 @@ idf.py -p /dev/cu.usbmodem* flash monitor
 | Symptom in build log | Likely cause | Fix |
 |---|---|---|
 | `xtensa-esp32-elf-gcc` in commands | Target is `esp32`, not `esp32s3` | `rm -rf build && idf.py set-target esp32s3` |
-| `CMake Error ... unknown component: mqtt` | ESP-IDF v6.0 sourced | Source v5.5.2 (`. $IDF_PATH/export.sh`) |
+| `CMake Error ... unknown component: mqtt` | ESP-IDF v6.0 sourced | `source scripts/use-idf-5.5.sh` |
+| `Requirement '…' was not met. Installed version: …` + `IDF_PYTHON_ENV_PATH: .../idf6.0_py3.14_env` | v6.0 env vars leaking into a shell that then sourced v5.5.2 | `source scripts/use-idf-5.5.sh` (it `unset`s the stale vars first) |
+| `.: no such file or directory: .../export.shcd` | Pasted newline was dropped between `export.sh` and `cd` | Run the lines separately, or use the helper |
 | `ld: cannot find Fellowship: No such file or directory` (or any unknown `-L<word>`) during final link | Project path contains spaces; managed components emit unquoted `-L` flags | Build from a no-space path (`~/esp-box3`) |
 | Assets missing / wake word not recognized | `sdkconfig` out of sync with defaults | Delete `sdkconfig`, rebuild — defaults merge automatically via `CMakeLists.txt` |
 
