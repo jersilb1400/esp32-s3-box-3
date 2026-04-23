@@ -6,8 +6,11 @@ Upstream application logic, board ports, and licenses are unchanged unless noted
 
 ## Requirements
 
-- **ESP-IDF v5.5.2** (or newer 5.5.x matching the project’s `idf` component constraint). Install per [Espressif docs](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
+- **ESP-IDF v5.5.2** (or newer 5.5.x matching the project’s `idf` component constraint). **Do NOT use ESP-IDF v6.0** — core `mqtt` was removed/reworked and CMake will fail with `unknown component mqtt`. Install per [Espressif docs](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
+- Target chip must be `esp32s3`. Always run `idf.py set-target esp32s3` on a clean tree before `idf.py build`, otherwise the default `esp32` target (xtensa-esp32-elf toolchain) will be used.
 - On Debian/Ubuntu you may need: `sudo apt install python3.12-venv` (or matching `python3-venv` for your Python).
+
+See [`docs/BUILD_NOTES.md`](docs/BUILD_NOTES.md) for the full recovery/clean-build procedure and a symptoms-to-cause table.
 
 ## Preset configuration
 
