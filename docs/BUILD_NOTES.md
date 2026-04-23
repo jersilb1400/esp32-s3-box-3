@@ -81,10 +81,32 @@ idf.py -p /dev/cu.usbmodem* flash monitor
 | `.: no such file or directory: .../export.shcd` | Pasted newline was dropped between `export.sh` and `cd` | Run the lines separately, or use the helper |
 | `ld: cannot find Fellowship: No such file or directory` (or any unknown `-L<word>`) during final link | Project path contains spaces; managed components emit unquoted `-L` flags | Build from a no-space path (`~/esp-box3`) |
 | Assets missing / wake word not recognized | `sdkconfig` out of sync with defaults | Delete `sdkconfig`, rebuild — defaults merge automatically via `CMakeLists.txt` |
+| `A fatal error occurred: File generated_assets.bin (length N) at offset 0x800000 will not fit in 16777216 bytes of flash` | Old stock `v2/16m.csv` has only 8 MB for assets; this preset builds ~10 MB | Preset now selects `partitions/v2/16m_box3_xiaozhi.csv` (12 MB assets, no OTA). If you forked the preset, match that selection. |
+
+## Flash layout (BOX-3 preset, 16 MB)
+
+This preset uses a **custom, single-app layout** —
+`partitions/v2/16m_box3_xiaozhi.csv` — selected by
+`sdkconfig.defaults.esp-box3-xiaozhi`:
+
+```
+0x000000  bootloader
+0x008000  partition_table           (4 KB)
+0x009000  nvs                       (16 KB, preserves WiFi creds across reflash)
+0x00f000  phy_init                  (4 KB)
+0x020000  factory  app              (4 MB   — ~16 % free with current build)
+0x410000  assets   spiffs           (12 MB  — fits the ~10 MB Multinet7 + emoji + fonts bundle)
+0x1000000 end of flash
+```
+
+Trade-off: **no OTA**. Firmware updates must be flashed over USB. If you
+ever re-enable OTA, you need to either shrink `generated_assets.bin`
+(disable custom wake word or drop emoji/fonts) or move to a 32 MB module.
 
 ## Why this project expects these defaults
 
 See top-level `README.md` and `sdkconfig.defaults.esp-box3-xiaozhi`. The
 BOX-3 preset enables: `CONFIG_BOARD_TYPE_ESP_BOX_3`,
 `CONFIG_FLASH_DEFAULT_ASSETS`, English Multinet wake word `grace`
-(display `Grace`), device-side AEC, and the audio processor pipeline.
+(display `Grace`), device-side AEC, the audio processor pipeline, and
+the single-app 12 MB-assets partition table described above.

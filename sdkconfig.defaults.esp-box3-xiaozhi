@@ -2,6 +2,13 @@
 # Espressif ESP-BOX-3 — defaults: built-in assets (so wake word + srmodels match sdkconfig),
 # English Multinet custom wake "grace" -> display "Grace", device-side AEC.
 
+# Partition table: single-app layout with ~12 MB assets to fit the
+# default asset bundle (grace Multinet model + emojis + fonts ~10 MB).
+# Overrides CONFIG_PARTITION_TABLE_CUSTOM_FILENAME from sdkconfig.defaults.
+# No OTA — updates must be flashed over USB.
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_box3_xiaozhi.csv"
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
+
 # Board (choice: exactly one)
 # CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI is not set
 CONFIG_BOARD_TYPE_ESP_BOX_3=y
