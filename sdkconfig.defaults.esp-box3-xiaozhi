@@ -9,6 +9,11 @@
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_box3_xiaozhi.csv"
 # CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
 
+# UI / system language — default from Kconfig.projbuild is Chinese (LANGUAGE_ZH_CN).
+# Override to English so provisioning screen, menus, and TTS prompts render in English.
+# CONFIG_LANGUAGE_ZH_CN is not set
+CONFIG_LANGUAGE_EN_US=y
+
 # Board (choice: exactly one)
 # CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI is not set
 CONFIG_BOARD_TYPE_ESP_BOX_3=y
