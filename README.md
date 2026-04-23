@@ -39,17 +39,27 @@ The first CMake run may **download** the custom assets `.bin` into `build/` for 
 
 Hardware-specific notes for BOX-3 and add-ons are in `main/boards/esp-box-3/README.md`.
 
-## Git remote
+## Git remotes
 
-After `git clone` of **your** hosting URL, this repo has no upstream `origin` until you add one:
+Canonical fork URL: [github.com/jersilb1400/esp32-s3-box-3](https://github.com/jersilb1400/esp32-s3-box-3).
+
+Clone:
 
 ```bash
-git remote add origin https://github.com/YOUR_USER/YOUR_REPO.git
+git clone https://github.com/jersilb1400/esp32-s3-box-3.git
+cd esp32-s3-box-3
+```
+
+If you already have a local copy and need to publish:
+
+```bash
+git remote add origin https://github.com/jersilb1400/esp32-s3-box-3.git
 git push -u origin main
 ```
 
-To pull fixes from upstream xiaozhi-esp32 later (this clone may already define `upstream`):
+To pull fixes from upstream [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32):
 
 ```bash
+git remote add upstream https://github.com/78/xiaozhi-esp32.git   # if not already added
 git fetch upstream && git merge upstream/main
 ```
