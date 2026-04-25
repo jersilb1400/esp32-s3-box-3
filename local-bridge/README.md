@@ -124,6 +124,8 @@ In `.env`: `TTS_PROVIDER=http`, `TTS_HTTP_URL=http://127.0.0.1:9002/synthesize`,
 
 ## Environment
 
+Optional **`BRIDGE_SYSTEM_PROMPT_FILE`**: absolute path to a UTF-8 text file used as the LLM system prompt (overrides inline `BRIDGE_SYSTEM_PROMPT` when the file exists). Useful for long JARVIS-style personas without huge `.env` lines.
+
 Primary options:
 
 - `LLM_PROVIDER=ollama|anthropic` (default: **`anthropic`** — Claude API)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -9,6 +10,16 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _system_prompt_from_env(default: str) -> str:
+    path_raw = os.getenv("BRIDGE_SYSTEM_PROMPT_FILE", "").strip().strip('"').strip("'")
+    if path_raw:
+        p = Path(path_raw).expanduser()
+        if p.is_file():
+            return p.read_text(encoding="utf-8").strip()
+    raw = os.getenv("BRIDGE_SYSTEM_PROMPT", default)
+    return raw.strip().strip('"').strip("'") if raw else default
 
 
 @dataclass(frozen=True)
@@ -81,9 +92,8 @@ class BridgeConfig:
             anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             anthropic_version=os.getenv("ANTHROPIC_VERSION", "2023-06-01"),
             anthropic_max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", "512")),
-            system_prompt=os.getenv(
-                "BRIDGE_SYSTEM_PROMPT",
-                "You are a concise assistant for an ESP32 voice device.",
+            system_prompt=_system_prompt_from_env(
+                "You are a concise assistant for an ESP32 voice device."
             ),
             openclaude_skill_url=os.getenv("OPENCLAUDE_SKILL_URL", ""),
             openclaude_api_key=os.getenv("OPENCLAUDE_API_KEY", ""),
