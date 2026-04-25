@@ -110,3 +110,50 @@ BOX-3 preset enables: `CONFIG_BOARD_TYPE_ESP_BOX_3`,
 `CONFIG_FLASH_DEFAULT_ASSETS`, English Multinet wake word `grace`
 (display `Grace`), device-side AEC, the audio processor pipeline, and
 the single-app 12 MB-assets partition table described above.
+
+## Sensor support (BOX-3 + SENSOR/DOCK/BREAD/BRACKET)
+
+The `esp-box-3` board implementation now includes sensor support using
+Espressif components:
+
+- `espressif/icm42670` (base IMU on BOX-3)
+- `espressif/aht20` (temperature/humidity on SENSOR dock)
+- `espressif/at581x` (radar on SENSOR dock)
+- `espressif/i2c_bus` (dock I2C transport)
+
+### Pin mapping used by firmware
+
+From Espressif `esp-box` BSP/factory-demo sources:
+
+- Dock I2C: `GPIO40` SCL, `GPIO41` SDA
+- Radar OUT: `GPIO21`
+- IR control: `GPIO44` (low enables TX path)
+- IR TX: `GPIO39`
+- IR RX: `GPIO38`
+- IMU I2C (base unit): `GPIO18` SCL, `GPIO8` SDA
+
+### MCP tools added
+
+- `self.sensor.get_status`
+- `self.sensor.get_environment`
+- `self.sensor.get_imu`
+- `self.sensor.get_radar_presence`
+- `self.sensor.set_radar_enabled`
+- `self.sensor.get_ir_rx_level`
+- `self.sensor.set_ir_tx_enabled`
+- `self.pmod.read_gpio`
+- `self.pmod.write_gpio`
+
+### PMOD mapping exposed (`self.pmod.*`)
+
+- PMOD1: IO1=`GPIO42`, IO2=`GPIO20`, IO3=`GPIO39`, IO4=`GPIO40`,
+  IO5=`GPIO21`, IO6=`GPIO19`, IO7=`GPIO38`, IO8=`GPIO41`
+- PMOD2: IO1=`GPIO13`, IO2=`GPIO9`, IO3=`GPIO12`, IO4=`GPIO44`,
+  IO5=`GPIO10`, IO6=`GPIO14`, IO7=`GPIO11`, IO8=`GPIO43`
+
+### Known limits
+
+- Radar currently uses AT581x digital presence + hold timer semantics.
+  Distance/zones are not yet exposed.
+- IR currently exposes low-level RX state and TX path enable.
+  Full IR learning/playback flows are not implemented in this firmware.

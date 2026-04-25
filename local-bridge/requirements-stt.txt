@@ -1,0 +1,12 @@
+# Minimal STT server deps: Opus decode, HTTP, env loading.
+# Works with STT_ENGINE=openai, or for auto mode when OpenAI is the fallback.
+# (The bridge venv already has aiohttp from requirements.txt.)
+#
+# System: libopus (for opuslib)
+#   macOS:  brew install pkg-config opus
+#   Debian/Ubuntu: apt install libopus0 libopus-dev
+
+aiohttp>=3.10,<4
+numpy>=1.20
+opuslib
+python-dotenv>=1.0.0

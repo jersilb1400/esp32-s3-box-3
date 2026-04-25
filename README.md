@@ -12,6 +12,7 @@ Upstream application logic, board ports, and licenses are unchanged unless noted
 - On Debian/Ubuntu you may need: `sudo apt install python3.12-venv` (or matching `python3-venv` for your Python).
 
 See [`docs/BUILD_NOTES.md`](docs/BUILD_NOTES.md) for the full recovery/clean-build procedure and a symptoms-to-cause table.
+For JARVIS persona + British voice backend setup, see [`docs/JARVIS_AGENT_SETUP.md`](docs/JARVIS_AGENT_SETUP.md).
 
 ## Preset configuration
 

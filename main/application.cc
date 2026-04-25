@@ -497,7 +497,11 @@ void Application::InitializeProtocol() {
     
     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
         if (GetDeviceState() == kDeviceStateSpeaking) {
-            audio_service_.PushPacketToDecodeQueue(std::move(packet));
+            // Do not use wait=true here: the WebSocket callback can run at a high priority. Blocking
+            // until the Opus task frees decode-queue slots can starve that task and deadlock the
+            // stack. Prefer a large MAX_DECODE_PACKETS_IN_QUEUE in audio_service.h to avoid drops
+            // on long TTS (see also PushPacketToDecodeQueue).
+            audio_service_.PushPacketToDecodeQueue(std::move(packet), false);
         }
     });
     
@@ -524,20 +528,21 @@ void Application::InitializeProtocol() {
         if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
             if (strcmp(state->valuestring, "start") == 0) {
-                Schedule([this]() {
-                    aborted_ = false;
-                    SetDeviceState(kDeviceStateSpeaking);
-                });
+                // Synchronous: WebSocket may deliver Opus bytes immediately after this JSON. If we
+                // only Schedule, state is still "listening" and incoming audio is dropped. Reset
+                // decode queues *before* speaking here so a fast LAN does not receive binary before
+                // the async HandleStateChangedEvent runs (which would clear audio_decode_queue_).
+                audio_service_.ResetDecoder();
+                aborted_ = false;
+                SetDeviceState(kDeviceStateSpeaking);
             } else if (strcmp(state->valuestring, "stop") == 0) {
-                Schedule([this]() {
-                    if (GetDeviceState() == kDeviceStateSpeaking) {
-                        if (listening_mode_ == kListeningModeManualStop) {
-                            SetDeviceState(kDeviceStateIdle);
-                        } else {
-                            SetDeviceState(kDeviceStateListening);
-                        }
+                if (GetDeviceState() == kDeviceStateSpeaking) {
+                    if (listening_mode_ == kListeningModeManualStop) {
+                        SetDeviceState(kDeviceStateIdle);
+                    } else {
+                        SetDeviceState(kDeviceStateListening);
                     }
-                });
+                }
             } else if (strcmp(state->valuestring, "sentence_start") == 0) {
                 auto text = cJSON_GetObjectItem(root, "text");
                 if (cJSON_IsString(text)) {
@@ -876,16 +881,13 @@ void Application::HandleStateChangedEvent() {
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
 
-            // Make sure the audio processor is running
+            // The backend must see listen/state=start on every new listening turn; our bridge
+            // gates uplink binary on that flag. Realtime (AEC) may leave the audio processor
+            // running through speaking, so the old combined guard skipped SendStartListening on
+            // the 2nd+ turn — the server then dropped all mic audio (wake seemed to work, no reply).
+            protocol_->SendStartListening(listening_mode_);
+
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
-                // For auto mode, wait for playback queue to be empty before enabling voice processing
-                // This prevents audio truncation when STOP arrives late due to network jitter
-                if (listening_mode_ == kListeningModeAutoStop) {
-                    audio_service_.WaitForPlaybackQueueEmpty();
-                }
-                
-                // Send the start listening command
-                protocol_->SendStartListening(listening_mode_);
                 audio_service_.EnableVoiceProcessing(true);
             }
 
@@ -911,7 +913,8 @@ void Application::HandleStateChangedEvent() {
                 // Only AFE wake word can be detected in speaking mode
                 audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
             }
-            audio_service_.ResetDecoder();
+            // ResetDecoder is called synchronously in OnIncomingJson on tts "start" so we do not
+            // clear audio_decode_queue_ after the server has already sent Opus on a fast link.
             break;
         case kDeviceStateWifiConfiguring:
             audio_service_.EnableVoiceProcessing(false);
