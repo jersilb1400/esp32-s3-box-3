@@ -710,6 +710,14 @@ choice DISPLAY_STYLE
         depends on BOARD_TYPE_ESP_BOX || BOARD_TYPE_ESP_BOX_3 \
             || BOARD_TYPE_ESP_VOCAT || BOARD_TYPE_LICHUANG_DEV_S3 \
             || BOARD_TYPE_ESP_SENSAIRSHUTTLE
+
+    config USE_HUD_DISPLAY_STYLE
+        bool "HUD face (Iron Man / Jarvis style)"
+        depends on BOARD_TYPE_ESP_BOX_3
+        help
+            Two animated geometric eyes on a black background.
+            Eyes breathe when idle, scan when listening, pulse when speaking.
+            Requires ESP-BOX-3 (320x240 ILI9341).
 endchoice
 
 config USE_MULTILINE_CHAT_MESSAGE

@@ -1,0 +1,49 @@
+# Fly.io deployment for the Jarvis local-bridge.
+# Run: fly deploy  (from the local-bridge/ directory)
+# See step-by-step instructions in docs/FLY_IO_DEPLOYMENT.md
+
+app = "jarvis-bridge"   # change to your chosen app name
+primary_region = "ord"  # Chicago — pick the region closest to you
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  BRIDGE_PORT           = "8080"
+  BRIDGE_HOST           = "0.0.0.0"
+  LLM_PROVIDER          = "anthropic"
+  ANTHROPIC_MODEL       = "claude-haiku-4-5-20251001"
+  ANTHROPIC_MAX_TOKENS  = "256"
+  STT_PROVIDER          = "openai"
+  TTS_PROVIDER          = "openai"
+  OPENAI_TTS_VOICE      = "fable"
+  BRIDGE_REALTIME_SILENCE_MS  = "500"
+  BRIDGE_REALTIME_MIN_OPUS_FRAMES = "1"
+  BRIDGE_REALTIME_SILENCE_EOU = "true"
+  BRIDGE_SYSTEM_PROMPT  = "You are Jarvis, a concise and witty British AI assistant for an ESP32 device. Keep replies under three sentences."
+  # Secrets (set via: fly secrets set KEY=value) — do NOT put here:
+  #   ANTHROPIC_API_KEY, OPENAI_API_KEY
+
+[[services]]
+  protocol    = "tcp"
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [services.http_checks]
+    interval      = "15s"
+    timeout       = "5s"
+    grace_period  = "10s"
+    method        = "GET"
+    path          = "/healthz"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

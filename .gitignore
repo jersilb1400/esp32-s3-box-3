@@ -20,3 +20,13 @@ mmap_generate_*.h
 .clangd
 FETCH_HEAD
 *.bundle
+
+# AI assistant artifacts
+context-snapshot.json
+
+# Local STT/TTS venvs
+local-bridge/.venv/
+local-bridge/.venv-stt/
+
+# sdkconfig backups (from sed operations)
+sdkconfig.bak*

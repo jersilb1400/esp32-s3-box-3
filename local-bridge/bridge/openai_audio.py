@@ -22,7 +22,7 @@ from .tts import TtsError
 # TTS: OpenAI pcm is 24 kHz; Opus to device must match server hello (BRIDGE_SERVER_SAMPLE_RATE, default 24000).
 # STT: uplink Opus from the device is 16 kHz (see audio_service.cc encoder_sample_rate_).
 SAMPLE_RATE = int(os.environ.get("TTS_OPUS_SAMPLE_RATE", os.environ.get("STT_OPUS_SAMPLE_RATE", "24000")))
-UPLINK_OPUS_SAMPLE_RATE = int(os.environ.get("STT_UPLINK_OPUS_SAMPLE_RATE", "16000"))
+UPLINK_OPUS_SAMPLE_RATE = int(os.environ.get("STT_UPLINK_OPUS_SAMPLE_RATE", "24000"))
 FRAME_MS = int(os.environ.get("STT_OPUS_FRAME_MS", "60"))
 SAMPLES_PER_FRAME = SAMPLE_RATE * FRAME_MS // 1000
 PCM_BYTES_PER_FRAME = SAMPLES_PER_FRAME * 2
