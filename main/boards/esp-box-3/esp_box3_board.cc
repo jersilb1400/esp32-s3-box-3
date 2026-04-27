@@ -4,6 +4,7 @@
 #include "display/emote_display.h"
 #include "display/lcd_display.h"
 #include "display/hud_display.h"
+#include "sensor_state.h"
 #include "esp_lcd_ili9341.h"
 #include "application.h"
 #include "button.h"
@@ -118,6 +119,15 @@ private:
                     imu_valid_ = true;
                 }
             }
+
+            // Publish to the cross-component sensor facade so the HUD display
+            // can show live readings without a tight board dependency.
+            sensor_state_publish_celsius(
+                sensor_dock_present_, radar_presence_, humiture_valid_,
+                temperature_c_, humidity_percent_,
+                imu_valid_,
+                accel_.x, accel_.y, accel_.z,
+                imu_temp_c_);
 
             // Emit periodic health/status telemetry so field validation does not depend on
             // interactive MCP calls while connected over serial-only workflows.

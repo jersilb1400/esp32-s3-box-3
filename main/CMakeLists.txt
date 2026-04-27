@@ -19,6 +19,8 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lvgl_display/lvgl_display.cc"
             "display/emote_display.cc"
             "display/hud_display.cc"
+            "sensor_state.cc"
+            "weather_state.cc"
             "display/lvgl_display/emoji_collection.cc"
             "display/lvgl_display/lvgl_theme.cc"
             "display/lvgl_display/lvgl_font.cc"
@@ -972,6 +974,9 @@ idf_component_register(SRCS ${SOURCES}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     PRIV_REQUIRES
+                        esp_http_client
+                        esp-tls
+                        json
                         esp_pm
                         esp_psram
                         esp_netif

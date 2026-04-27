@@ -970,4 +970,35 @@ menu "TAIJIPAI_S3_CONFIG"
         启动双声道
 endmenu
 
+menu "Jarvis HUD extras"
+
+config WEATHER_API_KEY
+    string "OpenWeatherMap API key"
+    default ""
+    help
+        Free-tier OpenWeatherMap key from https://openweathermap.org/api.
+        Leave blank to disable the weather widget on the HUD.
+
+config WEATHER_LOCATION_ZIP
+    string "Weather location (ZIP,country)"
+    default "75494,us"
+    help
+        ZIP code and country for the weather query, e.g. "75494,us".
+
+config WEATHER_POLL_INTERVAL_MIN
+    int "Weather poll interval (minutes)"
+    default 15
+    range 5 120
+
+config USE_PMOD_EXTERNAL_SPEAKER
+    bool "Mirror audio output to PMOD2 I2S pins (for external amp)"
+    default n
+    help
+        Enables I2S1 mirror output on PMOD2_IO1/IO2/IO3
+        (BCLK=GPIO13 LRCLK=GPIO9 DOUT=GPIO12). Drives e.g. a MAX98357A
+        breakout amp simultaneously with the internal speaker.
+
 endmenu
+
+endmenu
+
