@@ -11,6 +11,7 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <esp_http_client.h>
+#include <esp_crt_bundle.h>
 
 #include "cJSON.h"
 
@@ -82,7 +83,6 @@ bool fetch_once(weather_snapshot_t& out) {
     cfg.cert_pem = nullptr;
     cfg.skip_cert_common_name_check = false;
     // Use IDF's bundled root CA store (esp_crt_bundle is on by default in this project).
-    extern esp_err_t esp_crt_bundle_attach(void *conf);
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -171,5 +171,5 @@ extern "C" void weather_state_start(void) {
         ESP_LOGI(TAG, "no API key configured; weather disabled");
         return;
     }
-    xTaskCreatePinnedToCore(poller_task, "weather", 6 * 1024, nullptr, 3, nullptr, 0);
+    xTaskCreatePinnedToCore(poller_task, "weather", 10 * 1024, nullptr, 3, nullptr, 0);
 }

@@ -976,6 +976,7 @@ idf_component_register(SRCS ${SOURCES}
                     PRIV_REQUIRES
                         esp_http_client
                         esp-tls
+                        mbedtls
                         json
                         esp_pm
                         esp_psram

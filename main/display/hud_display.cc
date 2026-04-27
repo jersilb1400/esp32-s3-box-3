@@ -15,16 +15,19 @@
 #define SCREEN_W 320
 #define SCREEN_H 240
 
-#define TOP_H    18    // top status bar
+#define TOP_PAD  4     // panel top margin to avoid edge clipping
+#define TOP_H    24    // top status bar (text + padding)
 #define BOT_H    28    // bottom chat label
 
 // Eyes own the upper area, full width. No side columns now.
-#define EYE_W     88
-#define EYE_H     54
+// Slightly smaller eyes so the bottom info strip fits comfortably with the
+// taller top bar and bigger label rows.
+#define EYE_W     78
+#define EYE_H     46
 #define EYE_R     7
 #define EYE_BDR   3
-#define EYE_GAP   24
-#define EYE_CY    (TOP_H + 8 + EYE_H/2)
+#define EYE_GAP   22
+#define EYE_CY    (TOP_H + 4 + EYE_H/2)
 
 #define EYE_LEFT_CX  (SCREEN_W/2 - EYE_GAP/2 - EYE_W/2)
 #define EYE_RIGHT_CX (SCREEN_W/2 + EYE_GAP/2 + EYE_W/2)
@@ -325,14 +328,14 @@ void HudLcdDisplay::BuildHudUi() {
     // ── Top status strip ───────────────────────────────────────────────────
     top_label_ = lv_label_create(screen);
     lv_obj_set_size(top_label_, SCREEN_W, TOP_H);
-    lv_obj_set_pos(top_label_, 0, 0);
+    lv_obj_set_pos(top_label_, 0, TOP_PAD);
     lv_obj_set_style_text_color(top_label_, C_HUD, 0);
     lv_obj_set_style_bg_opa(top_label_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_text_align(top_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(top_label_, "JARVIS ONLINE");
 
     time_label_ = lv_label_create(screen);
-    lv_obj_set_pos(time_label_, SCREEN_W - 70, 1);
+    lv_obj_set_pos(time_label_, SCREEN_W - 60, TOP_PAD);
     lv_obj_set_style_text_color(time_label_, C_HUD_DIM, 0);
     lv_label_set_text(time_label_, "--:--");
 
@@ -356,11 +359,12 @@ void HudLcdDisplay::BuildHudUi() {
     auto make_label = [&](int x, int y, int width, lv_color_t color, lv_text_align_t align) {
         lv_obj_t* l = lv_label_create(screen);
         lv_obj_set_pos(l, x, y);
-        lv_obj_set_size(l, width, INFO_ROW_H);   // tall enough for full glyph + descenders
+        lv_obj_set_size(l, width, INFO_ROW_H);
         lv_obj_set_style_text_color(l, color, 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
         lv_obj_set_style_text_align(l, align, 0);
-        lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);  // truncate with "…" if cell is too narrow
+        // Default LV_LABEL_LONG_WRAP — will overflow horizontally rather than
+        // truncate, so we'd rather see the full text than "…"
         return l;
     };
     // 4 equal columns spanning the full width. Each ~80 px wide.
@@ -373,8 +377,8 @@ void HudLcdDisplay::BuildHudUi() {
     // Row 2: weather condition spans full width, centered, dim cyan.
     loc_label_ = make_label(4, INFO_ROW2_Y, SCREEN_W - 8, C_HUD_DIM, LV_TEXT_ALIGN_CENTER);
 
-    lv_label_set_text(temp_label_,    "ROOM --F");
-    lv_label_set_text(hum_label_,     "HUM --%");
+    lv_label_set_text(temp_label_,    "RM --F");
+    lv_label_set_text(hum_label_,     "H --%");
     lv_label_set_text(occ_label_,     "OCC ?");
     lv_label_set_text(weather_label_, "OUT --F");
     lv_label_set_text(loc_label_,     "");
@@ -492,13 +496,13 @@ void HudLcdDisplay::UpdateSensorWidgets() {
     char buf[24];
 
     if (s.dock_present && s.humiture_valid) {
-        std::snprintf(buf, sizeof(buf), "ROOM %.0fF", (double)s.temperature_f);
+        std::snprintf(buf, sizeof(buf), "RM %.0fF", (double)s.temperature_f);
         lv_label_set_text(temp_label_, buf);
-        std::snprintf(buf, sizeof(buf), "HUM %.0f%%", (double)s.humidity_percent);
+        std::snprintf(buf, sizeof(buf), "H %.0f%%", (double)s.humidity_percent);
         lv_label_set_text(hum_label_, buf);
     } else {
-        lv_label_set_text(temp_label_, "ROOM --F");
-        lv_label_set_text(hum_label_,  "HUM --%");
+        lv_label_set_text(temp_label_, "RM --F");
+        lv_label_set_text(hum_label_,  "H --%");
     }
 
     if (s.dock_present) {
@@ -555,8 +559,11 @@ void HudLcdDisplay::UpdateWeatherWidgets() {
 }
 
 // ── Public emotion / status / chat hooks ───────────────────────────────────
+// These run on the application/main task; LVGL callbacks run on the LVGL task.
+// Take DisplayLockGuard before any lv_* API or LVGL state corrupts and lv_inv_area spins.
 void HudLcdDisplay::SetEmotion(const char* emotion) {
     if (!emotion) return;
+    DisplayLockGuard lock(this);
     if (!std::strcmp(emotion, "listening")) {
         SetHudState(HudState::LISTENING);
         if (top_label_) lv_label_set_text(top_label_, "LISTENING");
@@ -571,6 +578,7 @@ void HudLcdDisplay::SetEmotion(const char* emotion) {
 
 void HudLcdDisplay::SetChatMessage(const char* role, const char* content) {
     if (!content || !bot_label_) return;
+    DisplayLockGuard lock(this);
     lv_label_set_text(bot_label_, content);
     if (role && !std::strcmp(role, "assistant")) {
         SetHudState(HudState::SPEAKING);
@@ -581,5 +589,6 @@ void HudLcdDisplay::SetChatMessage(const char* role, const char* content) {
 
 void HudLcdDisplay::SetStatus(const char* status) {
     if (!status || !top_label_) return;
+    DisplayLockGuard lock(this);
     lv_label_set_text(top_label_, status);
 }
