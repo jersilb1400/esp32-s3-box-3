@@ -6,6 +6,8 @@
 #include <esp_event.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <cstdlib>
+#include <ctime>
 
 #include "application.h"
 
@@ -21,6 +23,13 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    // Set local timezone to US Central with US DST rules. The clock task in
+    // lvgl_display uses localtime() which honors this. Format is POSIX TZ:
+    // CST is UTC-6, CDT is UTC-5; DST starts 2nd Sunday of March, ends 1st
+    // Sunday of November (US 2007+ rules).
+    setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
+    tzset();
 
     // Initialize and run the application
     auto& app = Application::GetInstance();

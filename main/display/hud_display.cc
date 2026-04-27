@@ -13,22 +13,23 @@
 
 // ── Layout ──────────────────────────────────────────────────────────────────
 //
-// 320×240 budget, allocated top-to-bottom. v3 layout drops the 4-column sensor
-// row (LVGL was clipping centered text in 80px cells) and gives the chat area
-// proper room. Reads cleanly even at arm's length.
+// 320×240 budget, allocated top-to-bottom. v4: enlarged slots so the Puhui
+// 14px font (which actually needs ~20px line height for proper Latin/CJK
+// rendering) doesn't get vertically clipped. Bumped TOP_PAD so the leading
+// "J" of "JARVIS" isn't kissed by the screen edge.
 //
-//   y=  0..27  Top status bar — state label LEFT, clock RIGHT, rule under
-//   y= 31..79  Eyes (the user's favorite)
-//   y= 85..103 Mouth waveform (animated when speaking, dashes otherwise)
-//   y=109..127 Single-line info bar: indoor + outdoor + occupancy
-//   y=133..207 Chat message area — 75px, bright, multi-line wrap
-//   y=211..238 Ticker — weather location/condition
+//   y=  0..29  Top status bar — state LEFT, clock RIGHT, rule under
+//   y= 36..84  Eyes (the user's favorite)
+//   y= 90..108 Mouth waveform
+//   y=114..138 Single-line info bar — indoor + occupancy + outdoor
+//   y=144..203 Chat message — 60px, multi-line, brightest
+//   y=208..238 Ticker — weather location/condition (scrolling forecast later)
 //
 #define SCREEN_W 320
 #define SCREEN_H 240
 
-#define TOP_PAD  3
-#define TOP_H    22
+#define TOP_PAD  6     // extra to keep label glyphs off the screen edge
+#define TOP_H    24    // 24px slot for ~20px Puhui glyphs
 
 // Eyes own the upper-middle. Slightly larger than v2 to feel iconic.
 #define EYE_W     76
@@ -56,15 +57,16 @@
 #define MOUTH_BAR_H_MAX  18
 #define MOUTH_Y          (EYE_CY + EYE_H/2 + 6)
 
-// Single-line info bar (indoor temp/humidity + occupancy + outdoor)
+// Single-line info bar (indoor + occupancy + outdoor). Tall enough for the
+// Puhui font without descender clipping.
 #define INFO_BAR_Y       (MOUTH_Y + MOUTH_BAR_H_MAX + 6)
-#define INFO_BAR_H       18
+#define INFO_BAR_H       24
 
-// Chat message area — the big middle slot
+// Chat message area
 #define CHAT_Y           (INFO_BAR_Y + INFO_BAR_H + 6)
-#define CHAT_H           74
+#define CHAT_H           60
 
-// Bottom ticker — weather context
+// Bottom ticker
 #define TICKER_Y         (CHAT_Y + CHAT_H + 4)
 #define TICKER_H         (SCREEN_H - TICKER_Y - 2)
 
@@ -544,33 +546,33 @@ void HudLcdDisplay::UpdateSensorWidgets() {
     sensor_snapshot_t s = sensor_state_get();
     weather_snapshot_t w = weather_state_get();
 
-    // Indoor segment
-    char indoor[32];
+    // Indoor segment (compact: "IN 79F 42%")
+    char indoor[24];
     if (s.dock_present && s.humiture_valid) {
-        std::snprintf(indoor, sizeof(indoor), "ROOM %.0fF  H %.0f%%",
+        std::snprintf(indoor, sizeof(indoor), "IN %.0fF %.0f%%",
                       (double)s.temperature_f, (double)s.humidity_percent);
     } else {
-        std::snprintf(indoor, sizeof(indoor), "ROOM --F  H --%%");
+        std::snprintf(indoor, sizeof(indoor), "IN --F --%%");
     }
 
-    // Occupancy segment (one char status indicator)
+    // Occupancy single-glyph indicator
     const char* occ_str;
-    if (!s.dock_present)             occ_str = "OCC ?";
-    else if (s.radar_presence)       occ_str = "OCC *";
-    else                             occ_str = "OCC -";
+    if (!s.dock_present)             occ_str = "?";
+    else if (s.radar_presence)       occ_str = "*";
+    else                             occ_str = "-";
 
-    // Outdoor segment
-    char outdoor[24];
+    // Outdoor segment (compact: "OUT 84F")
+    char outdoor[16];
     if (w.valid) {
         std::snprintf(outdoor, sizeof(outdoor), "OUT %.0fF", (double)w.temp_f);
     } else {
         std::snprintf(outdoor, sizeof(outdoor), "OUT --F");
     }
 
-    // Compose. Em-dash separators read cleanly on this display; default
-    // Latin glyph-set in lv_font_montserrat covers them.
-    char line[80];
-    std::snprintf(line, sizeof(line), "%s  -  %s  -  %s", indoor, occ_str, outdoor);
+    // One short line. Each segment ~10 chars, separated by spaces.
+    // Total ~28 chars × ~10px Puhui = ~280px in a 312px slot.
+    char line[64];
+    std::snprintf(line, sizeof(line), "%s  %s  %s", indoor, outdoor, occ_str);
     lv_label_set_text(temp_label_, line);
 
     // Tint the bar color slightly when occupant is present (gives a subtle
@@ -592,29 +594,50 @@ void HudLcdDisplay::UpdateSensorWidgets() {
     }
 }
 
-// ── Bottom ticker (location + condition) ────────────────────────────────────
+// ── Bottom ticker (location + condition + 3-day forecast) ──────────────────
+// The ticker uses LV_LABEL_LONG_SCROLL_CIRCULAR, so a long string just keeps
+// scrolling. We pack: "Winnsboro · Overcast 84F · Mon Hi 88 Lo 70 Clear · Tue
+// Hi 92 Lo 73 Clear · Wed Hi 90 Lo 71 Cloudy". Total ~120 chars — scrolls
+// continuously across the bottom strip.
 void HudLcdDisplay::UpdateWeatherWidgets() {
     if (!loc_label_) return;
     weather_snapshot_t w = weather_state_get();
-    if (w.valid) {
-        // Capitalise condition for nicer display.
-        char cond[40];
-        std::strncpy(cond, w.condition, sizeof(cond) - 1);
-        cond[sizeof(cond) - 1] = '\0';
-        if (cond[0] >= 'a' && cond[0] <= 'z') cond[0] -= 32;
 
-        char combined[96];
-        if (w.location[0]) {
-            std::snprintf(combined, sizeof(combined), "%.31s  -  %.31s",
-                          w.location, cond);
-        } else {
-            std::snprintf(combined, sizeof(combined), "%.63s", cond);
-        }
-        lv_label_set_text(loc_label_, combined);
-    } else {
-        // No data yet — show a friendly placeholder rather than blank.
+    if (!w.valid) {
         lv_label_set_text(loc_label_, "Awaiting weather data...");
+        return;
     }
+
+    // Capitalise current condition for the ticker preamble.
+    char cond[40];
+    std::strncpy(cond, w.condition, sizeof(cond) - 1);
+    cond[sizeof(cond) - 1] = '\0';
+    if (cond[0] >= 'a' && cond[0] <= 'z') cond[0] -= 32;
+
+    // Build the preamble: "Winnsboro - Overcast clouds 84F"
+    char preamble[80];
+    if (w.location[0]) {
+        std::snprintf(preamble, sizeof(preamble),
+                      "%.31s  -  %s %.0fF",
+                      w.location, cond, (double)w.temp_f);
+    } else {
+        std::snprintf(preamble, sizeof(preamble), "%s %.0fF", cond, (double)w.temp_f);
+    }
+
+    // Append 3-day forecast (when available). Format each day as
+    // "Mon Hi 88 Lo 70 Clear" so meaning is unambiguous when scrolling past.
+    char ticker[256];
+    int len = std::snprintf(ticker, sizeof(ticker), "%s", preamble);
+    if (w.forecast_valid) {
+        for (int i = 0; i < 3 && len < (int)sizeof(ticker) - 24; ++i) {
+            const weather_forecast_day_t& d = w.forecast[i];
+            if (!d.valid) continue;
+            len += std::snprintf(ticker + len, sizeof(ticker) - len,
+                                 "  -  %s Hi %.0f Lo %.0f %s",
+                                 d.day, (double)d.high_f, (double)d.low_f, d.condition);
+        }
+    }
+    lv_label_set_text(loc_label_, ticker);
 }
 
 // ── Public emotion / status / chat hooks ───────────────────────────────────
@@ -636,9 +659,15 @@ void HudLcdDisplay::SetEmotion(const char* emotion) {
 }
 
 void HudLcdDisplay::SetChatMessage(const char* role, const char* content) {
-    if (!content || !bot_label_) return;
+    if (!bot_label_) return;
     DisplayLockGuard lock(this);
-    lv_label_set_text(bot_label_, content);
+    // Application clears the chat to "" on state transitions (CONNECTING etc).
+    // Don't let the slot go visually blank — show a friendly default instead.
+    if (!content || !content[0]) {
+        lv_label_set_text(bot_label_, "At your service, sir.");
+    } else {
+        lv_label_set_text(bot_label_, content);
+    }
     if (role && !std::strcmp(role, "assistant")) {
         SetHudState(HudState::SPEAKING);
     } else if (role && !std::strcmp(role, "user")) {
