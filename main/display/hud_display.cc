@@ -18,36 +18,34 @@
 #define TOP_H    18    // top status bar
 #define BOT_H    28    // bottom chat label
 
-// Two narrow side columns for sensor / weather metrics (so the eyes still own
-// the centre).
-#define SIDE_W   78    // each side column width
-#define EYE_AREA_X (SIDE_W)
-#define EYE_AREA_W (SCREEN_W - 2 * SIDE_W)
-
-// Eyes (centred within EYE_AREA)
-#define EYE_W     76
-#define EYE_H     50
+// Eyes own the upper area, full width. No side columns now.
+#define EYE_W     88
+#define EYE_H     54
 #define EYE_R     7
 #define EYE_BDR   3
-#define EYE_GAP   18                              // pixels between eyes
-#define EYE_CY    (TOP_H + 8 + EYE_H/2)           // ~50
+#define EYE_GAP   24
+#define EYE_CY    (TOP_H + 8 + EYE_H/2)
 
 #define EYE_LEFT_CX  (SCREEN_W/2 - EYE_GAP/2 - EYE_W/2)
 #define EYE_RIGHT_CX (SCREEN_W/2 + EYE_GAP/2 + EYE_W/2)
 
 // Iris
-#define IRIS_D   24
+#define IRIS_D   28
 
 // Scan arc
-#define SCAN_D       42
+#define SCAN_D       46
 #define SCAN_ARC_W   4
 
-// Mouth waveform — between eyes (bottom) and bottom chat label
-#define MOUTH_Y       (EYE_CY + EYE_H/2 + 14)
-#define MOUTH_BAR_W   8
-#define MOUTH_BAR_GAP 4
+// Mouth waveform — directly below the eyes
+#define MOUTH_Y       (EYE_CY + EYE_H/2 + 6)
+#define MOUTH_BAR_W   10
+#define MOUTH_BAR_GAP 5
 #define MOUTH_BAR_H_MIN 3
-#define MOUTH_BAR_H_MAX 28
+#define MOUTH_BAR_H_MAX 26
+
+// Sensor info strip — horizontal row(s) below the mouth, above the chat
+#define INFO_ROW1_Y   (MOUTH_Y + MOUTH_BAR_H_MAX + 12)   // primary metrics
+#define INFO_ROW2_Y   (INFO_ROW1_Y + 16)                 // weather condition / location
 
 // ── Colour palette ──────────────────────────────────────────────────────────
 #define C_BG       lv_color_hex(0x000000)
@@ -344,26 +342,35 @@ void HudLcdDisplay::BuildHudUi() {
     CreateEye(screen, EYE_LEFT_CX,  EYE_CY, &eye_left_frame_,  &iris_left_,  &scan_left_);
     CreateEye(screen, EYE_RIGHT_CX, EYE_CY, &eye_right_frame_, &iris_right_, &scan_right_);
 
-    // ── Left metrics column ────────────────────────────────────────────────
-    auto make_label = [&](int x, int y, lv_color_t color) {
+    // ── Info strip below the mouth ─────────────────────────────────────────
+    // Row 1: ROOM 77F   HUM 49%   OCC *   OUT 65F
+    // Row 2: weather condition + location (centered)
+    //
+    // Layout uses fixed column centres so the labels stay nicely aligned.
+    auto make_label = [&](int x, int y, int width, lv_color_t color, lv_text_align_t align) {
         lv_obj_t* l = lv_label_create(screen);
         lv_obj_set_pos(l, x, y);
+        lv_obj_set_size(l, width, 14);
         lv_obj_set_style_text_color(l, color, 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_align(l, align, 0);
         return l;
     };
-    temp_label_    = make_label(2,  TOP_H + 6,  C_HUD);
-    hum_label_     = make_label(2,  TOP_H + 22, C_HUD_DIM);
-    weather_label_ = make_label(2,  TOP_H + 40, C_SPEAK);
-    loc_label_     = make_label(2,  TOP_H + 56, C_HUD_DIM);
-    lv_label_set_text(temp_label_,    "ROOM --F");
-    lv_label_set_text(hum_label_,     "HUM  --%");
-    lv_label_set_text(weather_label_, "OUT  --F");
-    lv_label_set_text(loc_label_,     "");
+    // 4 equal columns spanning the full width. Each ~80 px wide.
+    const int col_w = SCREEN_W / 4;
+    temp_label_    = make_label(0 * col_w, INFO_ROW1_Y, col_w, C_HUD,     LV_TEXT_ALIGN_CENTER);
+    hum_label_     = make_label(1 * col_w, INFO_ROW1_Y, col_w, C_HUD_DIM, LV_TEXT_ALIGN_CENTER);
+    occ_label_     = make_label(2 * col_w, INFO_ROW1_Y, col_w, C_HUD,     LV_TEXT_ALIGN_CENTER);
+    weather_label_ = make_label(3 * col_w, INFO_ROW1_Y, col_w, C_SPEAK,   LV_TEXT_ALIGN_CENTER);
 
-    // ── Right metrics column ───────────────────────────────────────────────
-    occ_label_ = make_label(SCREEN_W - SIDE_W + 4, TOP_H + 6, C_HUD);
-    lv_label_set_text(occ_label_, "OCC  ?");
+    // Row 2: weather condition spans full width, centered, dim cyan.
+    loc_label_ = make_label(4, INFO_ROW2_Y, SCREEN_W - 8, C_HUD_DIM, LV_TEXT_ALIGN_CENTER);
+
+    lv_label_set_text(temp_label_,    "ROOM --F");
+    lv_label_set_text(hum_label_,     "HUM --%");
+    lv_label_set_text(occ_label_,     "OCC ?");
+    lv_label_set_text(weather_label_, "OUT --F");
+    lv_label_set_text(loc_label_,     "");
 
     // ── Animated mouth (waveform bars) ─────────────────────────────────────
     const int total_w = kMouthBars * MOUTH_BAR_W + (kMouthBars - 1) * MOUTH_BAR_GAP;
@@ -481,20 +488,20 @@ void HudLcdDisplay::UpdateSensorWidgets() {
         std::snprintf(buf, sizeof(buf), "HUM %.0f%%", (double)s.humidity_percent);
         lv_label_set_text(hum_label_, buf);
     } else {
-        lv_label_set_text(temp_label_, "ROOM  --F");
-        lv_label_set_text(hum_label_,  "HUM   --%");
+        lv_label_set_text(temp_label_, "ROOM --F");
+        lv_label_set_text(hum_label_,  "HUM --%");
     }
 
     if (s.dock_present) {
         if (s.radar_presence) {
-            lv_label_set_text(occ_label_, "OCC  *");
+            lv_label_set_text(occ_label_, "OCC *");
             lv_obj_set_style_text_color(occ_label_, C_SPEAK, 0);
         } else {
-            lv_label_set_text(occ_label_, "OCC  -");
+            lv_label_set_text(occ_label_, "OCC -");
             lv_obj_set_style_text_color(occ_label_, C_HUD_DIM, 0);
         }
     } else {
-        lv_label_set_text(occ_label_, "DOCK?");
+        lv_label_set_text(occ_label_, "OCC ?");
         lv_obj_set_style_text_color(occ_label_, C_SCAN, 0);
     }
 
@@ -520,15 +527,20 @@ void HudLcdDisplay::UpdateWeatherWidgets() {
     if (w.valid) {
         std::snprintf(buf, sizeof(buf), "OUT %.0fF", (double)w.temp_f);
         lv_label_set_text(weather_label_, buf);
-        // Truncate condition to fit
-        char cond[24];
+        // Capitalised condition + location, e.g. "Clear sky · Winnsboro"
+        char cond[40];
         std::strncpy(cond, w.condition, sizeof(cond) - 1);
         cond[sizeof(cond) - 1] = '\0';
-        // Capitalise first letter (looks nicer)
         if (cond[0] >= 'a' && cond[0] <= 'z') cond[0] -= 32;
-        lv_label_set_text(loc_label_, cond);
+        char combined[96];
+        if (w.location[0]) {
+            std::snprintf(combined, sizeof(combined), "%.31s  -  %.31s", cond, w.location);
+        } else {
+            std::snprintf(combined, sizeof(combined), "%.63s", cond);
+        }
+        lv_label_set_text(loc_label_, combined);
     } else {
-        lv_label_set_text(weather_label_, "OUT  --");
+        lv_label_set_text(weather_label_, "OUT --F");
         lv_label_set_text(loc_label_,     "");
     }
 }
