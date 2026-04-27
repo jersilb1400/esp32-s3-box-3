@@ -36,16 +36,17 @@
 #define SCAN_D       46
 #define SCAN_ARC_W   4
 
-// Mouth waveform — directly below the eyes
+// Mouth waveform — directly below the eyes (always visible; min when idle)
 #define MOUTH_Y       (EYE_CY + EYE_H/2 + 6)
 #define MOUTH_BAR_W   10
 #define MOUTH_BAR_GAP 5
-#define MOUTH_BAR_H_MIN 3
-#define MOUTH_BAR_H_MAX 26
+#define MOUTH_BAR_H_MIN 3      // baseline height when not speaking
+#define MOUTH_BAR_H_MAX 22
 
 // Sensor info strip — horizontal row(s) below the mouth, above the chat
-#define INFO_ROW1_Y   (MOUTH_Y + MOUTH_BAR_H_MAX + 12)   // primary metrics
-#define INFO_ROW2_Y   (INFO_ROW1_Y + 16)                 // weather condition / location
+#define INFO_ROW_H    20                                  // tall enough for default 14px font + descenders
+#define INFO_ROW1_Y   (MOUTH_Y + MOUTH_BAR_H_MAX + 8)
+#define INFO_ROW2_Y   (INFO_ROW1_Y + INFO_ROW_H + 2)
 
 // ── Colour palette ──────────────────────────────────────────────────────────
 #define C_BG       lv_color_hex(0x000000)
@@ -148,12 +149,17 @@ void HudLcdDisplay::SetHudState(HudState state) {
         if (scan_right_) lv_obj_add_flag(scan_right_, LV_OBJ_FLAG_HIDDEN);
     }
 
-    if (state == HudState::SPEAKING) {
-        for (int i = 0; i < kMouthBars; ++i)
-            if (mouth_bars_[i]) lv_obj_clear_flag(mouth_bars_[i], LV_OBJ_FLAG_HIDDEN);
-    } else {
-        for (int i = 0; i < kMouthBars; ++i)
-            if (mouth_bars_[i]) lv_obj_add_flag(mouth_bars_[i], LV_OBJ_FLAG_HIDDEN);
+    // Mouth bars stay visible in all states — animated during SPEAKING,
+    // static minimum height (and dimmer colour) when idle/listening.
+    lv_color_t bar_color = (state == HudState::SPEAKING) ? C_SPEAK : C_HUD_DIM;
+    for (int i = 0; i < kMouthBars; ++i) {
+        if (!mouth_bars_[i]) continue;
+        lv_obj_clear_flag(mouth_bars_[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(mouth_bars_[i], bar_color, 0);
+        if (state != HudState::SPEAKING) {
+            lv_obj_set_height(mouth_bars_[i], MOUTH_BAR_H_MIN);
+            lv_obj_set_y(mouth_bars_[i], MOUTH_Y + (MOUTH_BAR_H_MAX - MOUTH_BAR_H_MIN) / 2);
+        }
     }
 }
 
@@ -350,10 +356,11 @@ void HudLcdDisplay::BuildHudUi() {
     auto make_label = [&](int x, int y, int width, lv_color_t color, lv_text_align_t align) {
         lv_obj_t* l = lv_label_create(screen);
         lv_obj_set_pos(l, x, y);
-        lv_obj_set_size(l, width, 14);
+        lv_obj_set_size(l, width, INFO_ROW_H);   // tall enough for full glyph + descenders
         lv_obj_set_style_text_color(l, color, 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
         lv_obj_set_style_text_align(l, align, 0);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);  // truncate with "…" if cell is too narrow
         return l;
     };
     // 4 equal columns spanning the full width. Each ~80 px wide.
@@ -379,11 +386,13 @@ void HudLcdDisplay::BuildHudUi() {
         lv_obj_t* b = lv_obj_create(screen);
         lv_obj_remove_style_all(b);
         lv_obj_set_size(b, MOUTH_BAR_W, MOUTH_BAR_H_MIN);
-        lv_obj_set_pos(b, x0 + i * (MOUTH_BAR_W + MOUTH_BAR_GAP), MOUTH_Y);
-        lv_obj_set_style_bg_color(b, C_SPEAK, 0);
+        // Vertically centre the minimum-height bar within the mouth slot
+        lv_obj_set_pos(b, x0 + i * (MOUTH_BAR_W + MOUTH_BAR_GAP),
+                       MOUTH_Y + (MOUTH_BAR_H_MAX - MOUTH_BAR_H_MIN) / 2);
+        lv_obj_set_style_bg_color(b, C_HUD_DIM, 0);  // dim baseline when idle
         lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(b, 2, 0);
-        lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);   // hidden until SPEAKING
+        // Always visible — height + colour change when SPEAKING
         mouth_bars_[i] = b;
     }
 
