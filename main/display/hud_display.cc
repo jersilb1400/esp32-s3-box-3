@@ -12,44 +12,61 @@
 #define TAG "HudDisplay"
 
 // ── Layout ──────────────────────────────────────────────────────────────────
+//
+// 320×240 budget, allocated top-to-bottom. v3 layout drops the 4-column sensor
+// row (LVGL was clipping centered text in 80px cells) and gives the chat area
+// proper room. Reads cleanly even at arm's length.
+//
+//   y=  0..27  Top status bar — state label LEFT, clock RIGHT, rule under
+//   y= 31..79  Eyes (the user's favorite)
+//   y= 85..103 Mouth waveform (animated when speaking, dashes otherwise)
+//   y=109..127 Single-line info bar: indoor + outdoor + occupancy
+//   y=133..207 Chat message area — 75px, bright, multi-line wrap
+//   y=211..238 Ticker — weather location/condition
+//
 #define SCREEN_W 320
 #define SCREEN_H 240
 
-#define TOP_PAD  4     // panel top margin to avoid edge clipping
-#define TOP_H    24    // top status bar (text + padding)
-#define BOT_H    28    // bottom chat label
+#define TOP_PAD  3
+#define TOP_H    22
 
-// Eyes own the upper area, full width. No side columns now.
-// Slightly smaller eyes so the bottom info strip fits comfortably with the
-// taller top bar and bigger label rows.
-#define EYE_W     78
-#define EYE_H     46
-#define EYE_R     7
+// Eyes own the upper-middle. Slightly larger than v2 to feel iconic.
+#define EYE_W     76
+#define EYE_H     48
+#define EYE_R     8
 #define EYE_BDR   3
-#define EYE_GAP   22
-#define EYE_CY    (TOP_H + 4 + EYE_H/2)
+#define EYE_GAP   28
+#define EYE_TOP   (TOP_PAD + TOP_H + 6)
+#define EYE_CY    (EYE_TOP + EYE_H/2)
 
 #define EYE_LEFT_CX  (SCREEN_W/2 - EYE_GAP/2 - EYE_W/2)
 #define EYE_RIGHT_CX (SCREEN_W/2 + EYE_GAP/2 + EYE_W/2)
 
 // Iris
-#define IRIS_D   28
+#define IRIS_D   30
 
 // Scan arc
-#define SCAN_D       46
+#define SCAN_D       48
 #define SCAN_ARC_W   4
 
-// Mouth waveform — directly below the eyes (always visible; min when idle)
-#define MOUTH_Y       (EYE_CY + EYE_H/2 + 6)
-#define MOUTH_BAR_W   10
-#define MOUTH_BAR_GAP 5
-#define MOUTH_BAR_H_MIN 3      // baseline height when not speaking
-#define MOUTH_BAR_H_MAX 22
+// Mouth waveform
+#define MOUTH_BAR_W      10
+#define MOUTH_BAR_GAP    5
+#define MOUTH_BAR_H_MIN  3
+#define MOUTH_BAR_H_MAX  18
+#define MOUTH_Y          (EYE_CY + EYE_H/2 + 6)
 
-// Sensor info strip — horizontal row(s) below the mouth, above the chat
-#define INFO_ROW_H    20                                  // tall enough for default 14px font + descenders
-#define INFO_ROW1_Y   (MOUTH_Y + MOUTH_BAR_H_MAX + 8)
-#define INFO_ROW2_Y   (INFO_ROW1_Y + INFO_ROW_H + 2)
+// Single-line info bar (indoor temp/humidity + occupancy + outdoor)
+#define INFO_BAR_Y       (MOUTH_Y + MOUTH_BAR_H_MAX + 6)
+#define INFO_BAR_H       18
+
+// Chat message area — the big middle slot
+#define CHAT_Y           (INFO_BAR_Y + INFO_BAR_H + 6)
+#define CHAT_H           74
+
+// Bottom ticker — weather context
+#define TICKER_Y         (CHAT_Y + CHAT_H + 4)
+#define TICKER_H         (SCREEN_H - TICKER_Y - 2)
 
 // ── Colour palette ──────────────────────────────────────────────────────────
 #define C_BG       lv_color_hex(0x000000)
@@ -326,24 +343,34 @@ void HudLcdDisplay::BuildHudUi() {
     lv_obj_t* screen = lv_screen_active();
 
     // ── Top status strip ───────────────────────────────────────────────────
+    // top_label_ is the STATE label on the left ("JARVIS ONLINE", "LISTENING",
+    // "SPEAKING"). time_label_ is the clock on the right.
+    //
+    // Important: the base lvgl_display clock task calls SetStatus("HH:MM")
+    // every 10s when idle. We detect that pattern in SetStatus() and route to
+    // time_label_ so it doesn't clobber the state text.
     top_label_ = lv_label_create(screen);
-    lv_obj_set_size(top_label_, SCREEN_W, TOP_H);
-    lv_obj_set_pos(top_label_, 0, TOP_PAD);
+    lv_obj_set_size(top_label_, 200, TOP_H);
+    lv_obj_set_pos(top_label_, 8, TOP_PAD);
     lv_obj_set_style_text_color(top_label_, C_HUD, 0);
     lv_obj_set_style_bg_opa(top_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(top_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_align(top_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_label_set_long_mode(top_label_, LV_LABEL_LONG_DOT);
     lv_label_set_text(top_label_, "JARVIS ONLINE");
 
     time_label_ = lv_label_create(screen);
-    lv_obj_set_pos(time_label_, SCREEN_W - 60, TOP_PAD);
-    lv_obj_set_style_text_color(time_label_, C_HUD_DIM, 0);
+    lv_obj_set_size(time_label_, 100, TOP_H);
+    lv_obj_set_pos(time_label_, SCREEN_W - 100 - 8, TOP_PAD);
+    lv_obj_set_style_text_color(time_label_, C_SPEAK, 0);
+    lv_obj_set_style_bg_opa(time_label_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_text_align(time_label_, LV_TEXT_ALIGN_RIGHT, 0);
     lv_label_set_text(time_label_, "--:--");
 
     // Horizontal rule under top
     lv_obj_t* hline = lv_obj_create(screen);
     lv_obj_remove_style_all(hline);
     lv_obj_set_size(hline, SCREEN_W, 1);
-    lv_obj_set_pos(hline, 0, TOP_H);
+    lv_obj_set_pos(hline, 0, TOP_PAD + TOP_H + 1);
     lv_obj_set_style_bg_color(hline, C_HUD, 0);
     lv_obj_set_style_bg_opa(hline, LV_OPA_40, 0);
 
@@ -351,37 +378,42 @@ void HudLcdDisplay::BuildHudUi() {
     CreateEye(screen, EYE_LEFT_CX,  EYE_CY, &eye_left_frame_,  &iris_left_,  &scan_left_);
     CreateEye(screen, EYE_RIGHT_CX, EYE_CY, &eye_right_frame_, &iris_right_, &scan_right_);
 
-    // ── Info strip below the mouth ─────────────────────────────────────────
-    // Row 1: ROOM 77F   HUM 49%   OCC *   OUT 65F
-    // Row 2: weather condition + location (centered)
-    //
-    // Layout uses fixed column centres so the labels stay nicely aligned.
-    auto make_label = [&](int x, int y, int width, lv_color_t color, lv_text_align_t align) {
-        lv_obj_t* l = lv_label_create(screen);
-        lv_obj_set_pos(l, x, y);
-        lv_obj_set_size(l, width, INFO_ROW_H);
-        lv_obj_set_style_text_color(l, color, 0);
-        lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_text_align(l, align, 0);
-        // Default LV_LABEL_LONG_WRAP — will overflow horizontally rather than
-        // truncate, so we'd rather see the full text than "…"
-        return l;
-    };
-    // 4 equal columns spanning the full width. Each ~80 px wide.
-    const int col_w = SCREEN_W / 4;
-    temp_label_    = make_label(0 * col_w, INFO_ROW1_Y, col_w, C_HUD,     LV_TEXT_ALIGN_CENTER);
-    hum_label_     = make_label(1 * col_w, INFO_ROW1_Y, col_w, C_HUD_DIM, LV_TEXT_ALIGN_CENTER);
-    occ_label_     = make_label(2 * col_w, INFO_ROW1_Y, col_w, C_HUD,     LV_TEXT_ALIGN_CENTER);
-    weather_label_ = make_label(3 * col_w, INFO_ROW1_Y, col_w, C_SPEAK,   LV_TEXT_ALIGN_CENTER);
+    // ── Single-line info bar ───────────────────────────────────────────────
+    // Combines indoor + outdoor + occupancy into one bright, full-width row.
+    // We reuse the temp_label_ pointer for this combined label; the other
+    // sensor pointers (hum_label_, occ_label_, weather_label_) intentionally
+    // stay null and are not used after this rework.
+    temp_label_ = lv_label_create(screen);
+    lv_obj_set_size(temp_label_, SCREEN_W - 8, INFO_BAR_H);
+    lv_obj_set_pos(temp_label_, 4, INFO_BAR_Y);
+    lv_obj_set_style_text_color(temp_label_, C_HUD, 0);
+    lv_obj_set_style_bg_opa(temp_label_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_text_align(temp_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(temp_label_, LV_LABEL_LONG_DOT);
+    lv_label_set_text(temp_label_, "ROOM --F  H --%  OCC ?  OUT --F");
 
-    // Row 2: weather condition spans full width, centered, dim cyan.
-    loc_label_ = make_label(4, INFO_ROW2_Y, SCREEN_W - 8, C_HUD_DIM, LV_TEXT_ALIGN_CENTER);
+    // Sub-rule under info bar
+    lv_obj_t* iline = lv_obj_create(screen);
+    lv_obj_remove_style_all(iline);
+    lv_obj_set_size(iline, SCREEN_W - 40, 1);
+    lv_obj_set_pos(iline, 20, INFO_BAR_Y + INFO_BAR_H + 1);
+    lv_obj_set_style_bg_color(iline, C_HUD, 0);
+    lv_obj_set_style_bg_opa(iline, LV_OPA_30, 0);
 
-    lv_label_set_text(temp_label_,    "RM --F");
-    lv_label_set_text(hum_label_,     "H --%");
-    lv_label_set_text(occ_label_,     "OCC ?");
-    lv_label_set_text(weather_label_, "OUT --F");
-    lv_label_set_text(loc_label_,     "");
+    // hum/occ/weather labels intentionally unused in v3
+    hum_label_     = nullptr;
+    occ_label_     = nullptr;
+    weather_label_ = nullptr;
+
+    // Bottom ticker (location/condition) reuses loc_label_ pointer.
+    loc_label_ = lv_label_create(screen);
+    lv_obj_set_size(loc_label_, SCREEN_W - 8, TICKER_H);
+    lv_obj_set_pos(loc_label_, 4, TICKER_Y);
+    lv_obj_set_style_text_color(loc_label_, C_HUD, 0);
+    lv_obj_set_style_bg_opa(loc_label_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_text_align(loc_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(loc_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(loc_label_, "");
 
     // ── Animated mouth (waveform bars) ─────────────────────────────────────
     const int total_w = kMouthBars * MOUTH_BAR_W + (kMouthBars - 1) * MOUTH_BAR_GAP;
@@ -400,23 +432,27 @@ void HudLcdDisplay::BuildHudUi() {
         mouth_bars_[i] = b;
     }
 
-    // ── Bottom rule ────────────────────────────────────────────────────────
+    // ── Chat message area ──────────────────────────────────────────────────
+    // The "what Jarvis is saying" slot — biggest piece of real estate now.
+    // Wraps to multiple lines; centered horizontally, vertically inside its
+    // box. When the device is idle and there's no last message, we set a
+    // friendly default so this never appears empty.
+    bot_label_ = lv_label_create(screen);
+    lv_obj_set_size(bot_label_, SCREEN_W - 12, CHAT_H);
+    lv_obj_set_pos(bot_label_, 6, CHAT_Y);
+    lv_obj_set_style_text_color(bot_label_, C_SPEAK, 0);
+    lv_obj_set_style_bg_opa(bot_label_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_text_align(bot_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(bot_label_, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(bot_label_, "Ready, sir.");
+
+    // Rule above the bottom ticker
     lv_obj_t* bline = lv_obj_create(screen);
     lv_obj_remove_style_all(bline);
     lv_obj_set_size(bline, SCREEN_W, 1);
-    lv_obj_set_pos(bline, 0, SCREEN_H - BOT_H - 1);
+    lv_obj_set_pos(bline, 0, TICKER_Y - 2);
     lv_obj_set_style_bg_color(bline, C_HUD, 0);
     lv_obj_set_style_bg_opa(bline, LV_OPA_40, 0);
-
-    // ── Bottom chat label ──────────────────────────────────────────────────
-    bot_label_ = lv_label_create(screen);
-    lv_obj_set_size(bot_label_, SCREEN_W - 8, BOT_H);
-    lv_obj_set_pos(bot_label_, 4, SCREEN_H - BOT_H);
-    lv_obj_set_style_text_color(bot_label_, C_HUD, 0);
-    lv_obj_set_style_bg_opa(bot_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(bot_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(bot_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(bot_label_, "Ready");
 
     // Kick off the weather poller (no-op if no API key configured).
     weather_state_start();
@@ -489,36 +525,51 @@ void HudLcdDisplay::StepMouthAnimation() {
     }
 }
 
-// ── Sensor widgets ──────────────────────────────────────────────────────────
+// ── Combined info bar (indoor + outdoor + occupancy) ────────────────────────
+// One label, one line, full width. Reads sensor + weather snapshots and
+// formats them into a single bright row. Replaces the old 4-column layout
+// that LVGL was clipping in 80px cells.
 void HudLcdDisplay::UpdateSensorWidgets() {
     if (!temp_label_) return;
+
     sensor_snapshot_t s = sensor_state_get();
-    char buf[24];
+    weather_snapshot_t w = weather_state_get();
 
+    // Indoor segment
+    char indoor[32];
     if (s.dock_present && s.humiture_valid) {
-        std::snprintf(buf, sizeof(buf), "RM %.0fF", (double)s.temperature_f);
-        lv_label_set_text(temp_label_, buf);
-        std::snprintf(buf, sizeof(buf), "H %.0f%%", (double)s.humidity_percent);
-        lv_label_set_text(hum_label_, buf);
+        std::snprintf(indoor, sizeof(indoor), "ROOM %.0fF  H %.0f%%",
+                      (double)s.temperature_f, (double)s.humidity_percent);
     } else {
-        lv_label_set_text(temp_label_, "RM --F");
-        lv_label_set_text(hum_label_,  "H --%");
+        std::snprintf(indoor, sizeof(indoor), "ROOM --F  H --%%");
     }
 
-    if (s.dock_present) {
-        if (s.radar_presence) {
-            lv_label_set_text(occ_label_, "OCC *");
-            lv_obj_set_style_text_color(occ_label_, C_SPEAK, 0);
-        } else {
-            lv_label_set_text(occ_label_, "OCC -");
-            lv_obj_set_style_text_color(occ_label_, C_HUD_DIM, 0);
-        }
+    // Occupancy segment (one char status indicator)
+    const char* occ_str;
+    if (!s.dock_present)             occ_str = "OCC ?";
+    else if (s.radar_presence)       occ_str = "OCC *";
+    else                             occ_str = "OCC -";
+
+    // Outdoor segment
+    char outdoor[24];
+    if (w.valid) {
+        std::snprintf(outdoor, sizeof(outdoor), "OUT %.0fF", (double)w.temp_f);
     } else {
-        lv_label_set_text(occ_label_, "OCC ?");
-        lv_obj_set_style_text_color(occ_label_, C_SCAN, 0);
+        std::snprintf(outdoor, sizeof(outdoor), "OUT --F");
     }
 
-    // Update clock too — uses local time configured by SNTP elsewhere.
+    // Compose. Em-dash separators read cleanly on this display; default
+    // Latin glyph-set in lv_font_montserrat covers them.
+    char line[80];
+    std::snprintf(line, sizeof(line), "%s  -  %s  -  %s", indoor, occ_str, outdoor);
+    lv_label_set_text(temp_label_, line);
+
+    // Tint the bar color slightly when occupant is present (gives a subtle
+    // "eyes-on" feel when someone is in the room).
+    lv_color_t tint = (s.dock_present && s.radar_presence) ? C_SPEAK : C_HUD;
+    lv_obj_set_style_text_color(temp_label_, tint, 0);
+
+    // Update clock too — local time configured by SNTP elsewhere.
     if (time_label_) {
         time_t now;
         time(&now);
@@ -532,29 +583,28 @@ void HudLcdDisplay::UpdateSensorWidgets() {
     }
 }
 
-// ── Weather widgets ─────────────────────────────────────────────────────────
+// ── Bottom ticker (location + condition) ────────────────────────────────────
 void HudLcdDisplay::UpdateWeatherWidgets() {
-    if (!weather_label_) return;
+    if (!loc_label_) return;
     weather_snapshot_t w = weather_state_get();
-    char buf[40];
     if (w.valid) {
-        std::snprintf(buf, sizeof(buf), "OUT %.0fF", (double)w.temp_f);
-        lv_label_set_text(weather_label_, buf);
-        // Capitalised condition + location, e.g. "Clear sky · Winnsboro"
+        // Capitalise condition for nicer display.
         char cond[40];
         std::strncpy(cond, w.condition, sizeof(cond) - 1);
         cond[sizeof(cond) - 1] = '\0';
         if (cond[0] >= 'a' && cond[0] <= 'z') cond[0] -= 32;
+
         char combined[96];
         if (w.location[0]) {
-            std::snprintf(combined, sizeof(combined), "%.31s  -  %.31s", cond, w.location);
+            std::snprintf(combined, sizeof(combined), "%.31s  -  %.31s",
+                          w.location, cond);
         } else {
             std::snprintf(combined, sizeof(combined), "%.63s", cond);
         }
         lv_label_set_text(loc_label_, combined);
     } else {
-        lv_label_set_text(weather_label_, "OUT --F");
-        lv_label_set_text(loc_label_,     "");
+        // No data yet — show a friendly placeholder rather than blank.
+        lv_label_set_text(loc_label_, "Awaiting weather data...");
     }
 }
 
@@ -587,8 +637,31 @@ void HudLcdDisplay::SetChatMessage(const char* role, const char* content) {
     }
 }
 
+// SetStatus is called from two places that don't know about each other:
+//   1) The application's state machine: passes meaningful state strings like
+//      "STANDBY", "CONNECTING", "LISTENING".
+//   2) The base lvgl_display clock task: passes "HH:MM" every 10s when idle.
+// Without disambiguation, (2) clobbers (1) and the state text disappears.
+// We detect HH:MM here and route it to time_label_ instead.
+static bool looks_like_clock(const char* s) {
+    // Match exactly "HH:MM" with two digits, colon, two digits.
+    if (!s) return false;
+    int len = 0;
+    while (s[len] && len < 6) ++len;
+    if (len != 5) return false;
+    return s[0] >= '0' && s[0] <= '9'
+        && s[1] >= '0' && s[1] <= '9'
+        && s[2] == ':'
+        && s[3] >= '0' && s[3] <= '9'
+        && s[4] >= '0' && s[4] <= '9';
+}
+
 void HudLcdDisplay::SetStatus(const char* status) {
-    if (!status || !top_label_) return;
+    if (!status) return;
     DisplayLockGuard lock(this);
-    lv_label_set_text(top_label_, status);
+    if (looks_like_clock(status)) {
+        if (time_label_) lv_label_set_text(time_label_, status);
+    } else if (top_label_) {
+        lv_label_set_text(top_label_, status);
+    }
 }
