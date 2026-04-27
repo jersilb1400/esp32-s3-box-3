@@ -342,28 +342,52 @@ void HudLcdDisplay::RevealHud() {
 void HudLcdDisplay::BuildHudUi() {
     lv_obj_t* screen = lv_screen_active();
 
+    // Helper: build a fixed-size CONTAINER and put a label inside it. LVGL v9
+    // resizes a label to LV_SIZE_CONTENT whenever you set certain long_modes
+    // (notably LONG_WRAP and LONG_SCROLL_CIRCULAR), which would let dynamic
+    // text overflow our layout slots. Putting each dynamic label inside a
+    // container with SCROLLABLE cleared and zero padding guarantees the slot
+    // height/width never changes regardless of label content.
+    auto make_slot = [&](int x, int y, int w, int h, lv_obj_t** label_out,
+                         lv_color_t color, lv_label_long_mode_t mode,
+                         lv_text_align_t align) {
+        lv_obj_t* box = lv_obj_create(screen);
+        lv_obj_remove_style_all(box);
+        lv_obj_set_pos(box, x, y);
+        lv_obj_set_size(box, w, h);
+        lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_clip_corner(box, true, 0);
+        lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(box, 0, 0);
+
+        lv_obj_t* l = lv_label_create(box);
+        lv_obj_set_style_text_color(l, color, 0);
+        lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_align(l, align, 0);
+        lv_label_set_long_mode(l, mode);
+        // After set_long_mode (which may have set LV_SIZE_CONTENT), restore
+        // the slot's full width so wrap mode wraps at the slot edge.
+        lv_obj_set_width(l, w);
+        // Anchor the label inside the slot; height stays content-fit which
+        // is fine because the parent container clips overflow.
+        lv_obj_align(l, LV_ALIGN_TOP_MID, 0, 0);
+        *label_out = l;
+    };
+
     // ── Top status strip ───────────────────────────────────────────────────
-    // top_label_ is the STATE label on the left ("JARVIS ONLINE", "LISTENING",
-    // "SPEAKING"). time_label_ is the clock on the right.
+    // Each label lives inside a fixed-size slot so a long state name or an
+    // unexpected payload from the base lvgl_display clock task can never push
+    // the slot wider/taller and shove other elements around.
     //
-    // Important: the base lvgl_display clock task calls SetStatus("HH:MM")
-    // every 10s when idle. We detect that pattern in SetStatus() and route to
-    // time_label_ so it doesn't clobber the state text.
-    top_label_ = lv_label_create(screen);
-    lv_obj_set_size(top_label_, 200, TOP_H);
-    lv_obj_set_pos(top_label_, 8, TOP_PAD);
-    lv_obj_set_style_text_color(top_label_, C_HUD, 0);
-    lv_obj_set_style_bg_opa(top_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(top_label_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_label_set_long_mode(top_label_, LV_LABEL_LONG_DOT);
+    // SetStatus("HH:MM") (called every 10s when idle by the base class) is
+    // detected and routed to time_label_ rather than top_label_ — see
+    // looks_like_clock() / SetStatus() below.
+    make_slot(8, TOP_PAD, 200, TOP_H, &top_label_,
+              C_HUD, LV_LABEL_LONG_DOT, LV_TEXT_ALIGN_LEFT);
     lv_label_set_text(top_label_, "JARVIS ONLINE");
 
-    time_label_ = lv_label_create(screen);
-    lv_obj_set_size(time_label_, 100, TOP_H);
-    lv_obj_set_pos(time_label_, SCREEN_W - 100 - 8, TOP_PAD);
-    lv_obj_set_style_text_color(time_label_, C_SPEAK, 0);
-    lv_obj_set_style_bg_opa(time_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(time_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    make_slot(SCREEN_W - 100 - 8, TOP_PAD, 100, TOP_H, &time_label_,
+              C_SPEAK, LV_LABEL_LONG_DOT, LV_TEXT_ALIGN_RIGHT);
     lv_label_set_text(time_label_, "--:--");
 
     // Horizontal rule under top
@@ -378,18 +402,14 @@ void HudLcdDisplay::BuildHudUi() {
     CreateEye(screen, EYE_LEFT_CX,  EYE_CY, &eye_left_frame_,  &iris_left_,  &scan_left_);
     CreateEye(screen, EYE_RIGHT_CX, EYE_CY, &eye_right_frame_, &iris_right_, &scan_right_);
 
+
     // ── Single-line info bar ───────────────────────────────────────────────
     // Combines indoor + outdoor + occupancy into one bright, full-width row.
     // We reuse the temp_label_ pointer for this combined label; the other
     // sensor pointers (hum_label_, occ_label_, weather_label_) intentionally
     // stay null and are not used after this rework.
-    temp_label_ = lv_label_create(screen);
-    lv_obj_set_size(temp_label_, SCREEN_W - 8, INFO_BAR_H);
-    lv_obj_set_pos(temp_label_, 4, INFO_BAR_Y);
-    lv_obj_set_style_text_color(temp_label_, C_HUD, 0);
-    lv_obj_set_style_bg_opa(temp_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(temp_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(temp_label_, LV_LABEL_LONG_DOT);
+    make_slot(4, INFO_BAR_Y, SCREEN_W - 8, INFO_BAR_H, &temp_label_,
+              C_HUD, LV_LABEL_LONG_DOT, LV_TEXT_ALIGN_CENTER);
     lv_label_set_text(temp_label_, "ROOM --F  H --%  OCC ?  OUT --F");
 
     // Sub-rule under info bar
@@ -405,14 +425,9 @@ void HudLcdDisplay::BuildHudUi() {
     occ_label_     = nullptr;
     weather_label_ = nullptr;
 
-    // Bottom ticker (location/condition) reuses loc_label_ pointer.
-    loc_label_ = lv_label_create(screen);
-    lv_obj_set_size(loc_label_, SCREEN_W - 8, TICKER_H);
-    lv_obj_set_pos(loc_label_, 4, TICKER_Y);
-    lv_obj_set_style_text_color(loc_label_, C_HUD, 0);
-    lv_obj_set_style_bg_opa(loc_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(loc_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(loc_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    // Bottom ticker (location/condition).
+    make_slot(4, TICKER_Y, SCREEN_W - 8, TICKER_H, &loc_label_,
+              C_HUD, LV_LABEL_LONG_SCROLL_CIRCULAR, LV_TEXT_ALIGN_CENTER);
     lv_label_set_text(loc_label_, "");
 
     // ── Animated mouth (waveform bars) ─────────────────────────────────────
@@ -434,16 +449,10 @@ void HudLcdDisplay::BuildHudUi() {
 
     // ── Chat message area ──────────────────────────────────────────────────
     // The "what Jarvis is saying" slot — biggest piece of real estate now.
-    // Wraps to multiple lines; centered horizontally, vertically inside its
-    // box. When the device is idle and there's no last message, we set a
-    // friendly default so this never appears empty.
-    bot_label_ = lv_label_create(screen);
-    lv_obj_set_size(bot_label_, SCREEN_W - 12, CHAT_H);
-    lv_obj_set_pos(bot_label_, 6, CHAT_Y);
-    lv_obj_set_style_text_color(bot_label_, C_SPEAK, 0);
-    lv_obj_set_style_bg_opa(bot_label_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_text_align(bot_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(bot_label_, LV_LABEL_LONG_WRAP);
+    // Wraps to multiple lines; long replies stay clipped inside their box and
+    // CANNOT overflow into the info bar above or the ticker below.
+    make_slot(6, CHAT_Y, SCREEN_W - 12, CHAT_H, &bot_label_,
+              C_SPEAK, LV_LABEL_LONG_WRAP, LV_TEXT_ALIGN_CENTER);
     lv_label_set_text(bot_label_, "Ready, sir.");
 
     // Rule above the bottom ticker
