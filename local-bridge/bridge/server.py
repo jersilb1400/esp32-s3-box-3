@@ -310,6 +310,18 @@ class BridgeApp:
             await self._send_tts_text_only(ws, session_id, msg)
             return
 
+        if self.config.address_filter_word and self.config.address_filter_word not in prompt.lower():
+            logger.info(
+                "Address filter: discarding utterance (no %r found): %r",
+                self.config.address_filter_word,
+                prompt[:120],
+            )
+            # Send empty TTS cycle so the device cleanly returns to idle.
+            await ws.send_json({"session_id": session_id, "type": "tts", "state": "start"})
+            await asyncio.sleep(0.05)
+            await ws.send_json({"session_id": session_id, "type": "tts", "state": "stop"})
+            return
+
         await ws.send_json({"session_id": session_id, "type": "stt", "text": prompt})
         try:
             reply = self._generate_reply(prompt, session_id=session_id)

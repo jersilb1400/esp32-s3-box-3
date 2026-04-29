@@ -65,6 +65,11 @@ class BridgeConfig:
     tts_http_api_key: str = ""
     tts_timeout_s: float = 30.0
 
+    # When non-empty, utterances that do NOT contain this word (case-insensitive) are discarded.
+    # Prevents responding to nearby conversations not addressed to the assistant.
+    # Example: set to "jarvis" so only speech containing "jarvis" is processed.
+    address_filter_word: str = ""
+
     # ESP-Box with device AEC uses listen mode "realtime"; the device often never sends
     # listen/state=stop. After this many seconds with no new Opus frame, run STT (like stop).
     realtime_silence_end_ms: int = 1000
@@ -75,7 +80,7 @@ class BridgeConfig:
     def from_env(cls) -> "BridgeConfig":
         return cls(
             host=os.getenv("BRIDGE_HOST", "0.0.0.0"),
-            port=int(os.getenv("BRIDGE_PORT", "8000")),
+            port=int(os.getenv("BRIDGE_PORT", os.getenv("PORT", "8000"))),
             websocket_url=os.getenv("BRIDGE_WEBSOCKET_URL", "ws://127.0.0.1:8000/ws"),
             websocket_token=os.getenv("BRIDGE_WEBSOCKET_TOKEN", "local-dev-token"),
             websocket_version=int(os.getenv("BRIDGE_WEBSOCKET_VERSION", "1")),
@@ -106,6 +111,7 @@ class BridgeConfig:
             tts_http_url=os.getenv("TTS_HTTP_URL", ""),
             tts_http_api_key=os.getenv("TTS_HTTP_API_KEY", ""),
             tts_timeout_s=float(os.getenv("TTS_TIMEOUT_S", "30")),
+            address_filter_word=os.getenv("BRIDGE_ADDRESS_FILTER", "").strip().strip('"').strip("'").lower(),
             realtime_silence_end_ms=int(os.getenv("BRIDGE_REALTIME_SILENCE_MS", "1000")),
             realtime_silence_min_opus_frames=int(
                 os.getenv("BRIDGE_REALTIME_MIN_OPUS_FRAMES", "1")
