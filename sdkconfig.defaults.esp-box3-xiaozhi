@@ -10,8 +10,8 @@
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_box3_xiaozhi.csv"
 # CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
 
-# Fly.io bridge: JSON OTA endpoint
-CONFIG_OTA_URL="https://jarvis-server.fly.dev/xiaozhi/ota/"
+# Fly.io bridge: OTA lives on http_port (internal 8003) → public :8443 (see jarvis-server fly.toml)
+CONFIG_OTA_URL="https://jarvis-server.fly.dev:8443/xiaozhi/ota/"
 
 # UI / system language — default from Kconfig.projbuild is Chinese (LANGUAGE_ZH_CN).
 # Override to English so provisioning screen, menus, and TTS prompts render in English.
