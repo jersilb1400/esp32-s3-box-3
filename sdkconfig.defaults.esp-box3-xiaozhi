@@ -10,8 +10,8 @@
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_box3_xiaozhi.csv"
 # CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
 
-# Local bridge: JSON OTA endpoint (must match your Mac LAN IP and bridge port)
-CONFIG_OTA_URL="http://192.168.4.61:8000/xiaozhi/ota/"
+# Fly.io bridge: JSON OTA endpoint
+CONFIG_OTA_URL="https://jarvis-server.fly.dev/xiaozhi/ota/"
 
 # UI / system language — default from Kconfig.projbuild is Chinese (LANGUAGE_ZH_CN).
 # Override to English so provisioning screen, menus, and TTS prompts render in English.
@@ -49,3 +49,5 @@ CONFIG_WAKE_WORD_DETECTION_IN_LISTENING=y
 
 CONFIG_USE_AUDIO_PROCESSOR=y
 CONFIG_USE_DEVICE_AEC=y
+# Uplink wake-word Opus so the server can run speaker verification (Phase 1 Layer A)
+CONFIG_SEND_WAKE_WORD_DATA=y

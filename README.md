@@ -4,6 +4,12 @@ This repository is a **standalone copy** of [78/xiaozhi-esp32](https://github.co
 
 Upstream application logic, board ports, and licenses are unchanged unless noted in git history.
 
+## Project topology
+
+This repo contains ESP32-S3 ESP-BOX-3 **firmware** only. The companion **voice / LLM backend** is the separate **`jarvis-server`** tree (typically `~/jarvis-server`), deployed to **`https://jarvis-server.fly.dev/`**. Older experimental repos (**`jarvis-bridge`**, **`jarvis-agent-shim`**, legacy **`esp-box3`**) are archived under **`~/Archive/`** when consolidation is applied — do not fork new work there.
+
+Roadmaps and phased implementation notes: **`docs/plans/`**.
+
 ## Requirements
 
 - **ESP-IDF v5.5.2** (or newer 5.5.x matching the project’s `idf` component constraint). **Do NOT use ESP-IDF v6.0** — core `mqtt` was removed/reworked and CMake will fail with `unknown component mqtt`. Install per [Espressif docs](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
