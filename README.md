@@ -6,9 +6,11 @@ Upstream application logic, board ports, and licenses are unchanged unless noted
 
 ## Project topology
 
-This repo contains ESP32-S3 ESP-BOX-3 **firmware** only. The companion **voice / LLM backend** is the separate **`jarvis-server`** tree (typically `~/jarvis-server`), deployed to **`https://jarvis-server.fly.dev/`**. Older experimental repos (**`jarvis-bridge`**, **`jarvis-agent-shim`**, legacy **`esp-box3`**) are archived under **`~/Archive/`** when consolidation is applied — do not fork new work there.
+This repo contains ESP32-S3 ESP-BOX-3 **firmware** only. When kept inside the **Jarvis Ai 2** workspace, the folder name is **`firmware/`** (still the same git repository as **esp32-s3-box-3** on GitHub). The companion **voice / LLM backend** is the separate **`jarvis-server`** tree (typically `~/jarvis-server`), deployed to **`https://jarvis-server.fly.dev/`**. Older experimental repos (**`jarvis-bridge`**, **`jarvis-agent-shim`**, legacy **`esp-box3`**) are archived under **`~/Archive/`** when consolidation is applied — do not fork new work there.
 
 Roadmaps and phased implementation notes: **`docs/plans/`**.
+
+**Jarvis HUD (BOX-3 fork):** generators and generated RGB565/mesh artefacts are consolidated under **`jarvis_hud/`** (`README.txt` there describes layout; `main/CMakeLists.txt` wires the face blob into the app build).
 
 ## Requirements
 
@@ -41,7 +43,7 @@ Use `idf.py menuconfig` to change the phrase, threshold, or switch back to **AFE
 ```bash
 export IDF_PATH=/path/to/esp-idf   # v5.5.2+
 . $IDF_PATH/export.sh
-cd esp32-s3-box-3
+cd esp32-s3-box-3   # clone default; use `cd firmware` if this repo lives under `Jarvis Ai 2/`
 idf.py set-target esp32s3
 idf.py build
 idf.py -p PORT flash

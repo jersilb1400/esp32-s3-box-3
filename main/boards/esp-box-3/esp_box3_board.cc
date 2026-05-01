@@ -130,6 +130,23 @@ private:
                     accel_.x, accel_.y, accel_.z, gyro_.x, gyro_.y, gyro_.z);
             }
 
+#if CONFIG_BOX3_JARVIS_HUD
+            {
+                DockSensorHudData hud;
+                hud.dock_present = sensor_dock_present_;
+                hud.humiture_valid = humiture_valid_;
+                hud.temp_c = temperature_c_;
+                hud.humidity_percent = humidity_percent_;
+                hud.radar_enabled = radar_enabled_;
+                hud.radar_presence = radar_presence_;
+                hud.ir_rx_level = sensor_dock_present_ ? static_cast<int>(gpio_get_level(IR_RX_PIN)) : -1;
+                Display* dsp = GetDisplay();
+                if (dsp != nullptr) {
+                    dsp->UpdateDockSensorHud(hud);
+                }
+            }
+#endif
+
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
@@ -452,7 +469,7 @@ private:
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_lcd_panel_handle_t panel = nullptr;
 
-        // 液晶屏控制IO初始化
+        // LCD control GPIO init
         ESP_LOGD(TAG, "Install panel IO");
         esp_lcd_panel_io_spi_config_t io_config = {};
         io_config.cs_gpio_num = GPIO_NUM_5;
@@ -464,7 +481,7 @@ private:
         io_config.lcd_param_bits = 8;
         ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &panel_io));
 
-        // 初始化液晶屏驱动芯片
+        // Initialize LCD controller / panel
         ESP_LOGD(TAG, "Install LCD driver");
         const ili9341_vendor_config_t vendor_config = {
             .init_cmds = &vendor_specific_init[0],

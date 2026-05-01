@@ -131,8 +131,7 @@ For queries matching financial/medical/legal advice patterns, refuse and redirec
 ### Task 24: Apple Music
 MusicKit web API. More complex auth (developer token + Apple ID user token). Defer if Spotify covers user's needs. Document blocker.
 
-### Task 25: Amazon Music
-**No public API** for control. Mark as not feasible. Document for user.
+**Amazon Music:** out of scope — no usable public playback API; no tasks or fallbacks planned.
 
 ---
 

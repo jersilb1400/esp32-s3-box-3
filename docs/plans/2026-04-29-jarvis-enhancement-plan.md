@@ -54,7 +54,7 @@ Order: **Phase 0 (consolidate) → Phase 1 (speaker ID) → Phase 1.5 (reliabili
 | Q1 | **Hybrid speaker gating: biometric on wake word + diarization on utterance** (recommended over either alone — see Sub-project 1 rationale) |
 | Q2 | Models run on `jarvis-server` Fly.io |
 | Q3 | Voice-driven enrollment on the device (1-2 minutes, prompted phrases) |
-| Q4 | Integrations: Microsoft 365, Home Assistant/HomeKit, web search, music (Spotify/Apple/Amazon), llm-wiki vault, Slack/Monday.com/PCO via existing Claude connectors |
+| Q4 | Integrations: Microsoft 365, Home Assistant/HomeKit, web search, music (Spotify / optional Apple Music), llm-wiki vault, Slack/Monday.com/PCO via existing Claude connectors |
 | Q5 | Long-term memory: episodic recall + structured profile |
 | Q6 | Strict privacy default — voiceprints stay on Fly.io volume, encrypted at rest |
 | Q7 | Single-user (owner-only) — but data schema designed so multi-user is a non-breaking future add |
@@ -257,7 +257,6 @@ Run as separate Fly.io machines or as plugins within `jarvis-server`.
 | Web search | API key | **Brave Search API** (2,000 free queries/mo) — fallback to **DuckDuckGo HTML scraper** if exhausted | Free |
 | Spotify | OAuth2 | Web API | Free for control with premium account |
 | Apple Music | MusicKit JS / dev token | API | Free for control with subscription |
-| Amazon Music | (no public API) | **Skip — recommend dropping** unless willing to use Alexa Skills bridge | n/a |
 | llm-wiki vault | depends on what llm-wiki is | Need spec from user | Free if self-hosted |
 
 ### Category B — Existing Claude connectors (already built by user)

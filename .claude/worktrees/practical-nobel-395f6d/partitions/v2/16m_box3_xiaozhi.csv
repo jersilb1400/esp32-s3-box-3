@@ -1,0 +1,28 @@
+# ESP-IDF Partition Table — ESP-BOX-3 (Xiaozhi fork) 16MB layout
+#
+# Single-app layout sized for this preset, which builds a ~10MB
+# generated_assets.bin (English Multinet7 'grace' model + custom wake
+# word + fonts + emoji GIFs). The stock v2/16m.csv has only 8MB of
+# assets space and therefore cannot flash this configuration.
+#
+# Trade-off vs. v2/16m.csv: no over-the-air updates (no ota_0/ota_1);
+# future firmware changes must be flashed over USB.
+#
+# Preserves nvs at 0x9000 so WiFi credentials saved on a prior flash
+# still load after switching to this table.
+#
+# Layout (16 MB total):
+#   0x000000  bootloader            (hardware-fixed, ~32 KB used)
+#   0x008000  partition_table       (4 KB)
+#   0x009000  nvs                   16 KB
+#   0x00f000  phy_init              4 KB
+#   0x010000  (padding to app alignment)
+#   0x020000  factory               ~4 MB app
+#   0x410000  assets                ~12 MB SPIFFS
+#   0x1000000 end of flash
+#
+# Name,     Type, SubType, Offset,    Size,      Flags
+nvs,        data, nvs,     0x9000,    0x4000,
+phy_init,   data, phy,     0xf000,    0x1000,
+factory,    app,  factory, 0x20000,   0x3f0000,
+assets,     data, spiffs,  0x410000,  0xbf0000,

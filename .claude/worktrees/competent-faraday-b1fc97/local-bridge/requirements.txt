@@ -1,0 +1,3 @@
+aiohttp>=3.10,<4
+# In-process STT/TTS (STT_PROVIDER=openai / TTS_PROVIDER=openai) — same as brew install opus
+opuslib

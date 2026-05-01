@@ -1,0 +1,3 @@
+# Produced by jarvis_hud/tools (or idf.py build for the face blob)
+jarvis_artist_face_data.c
+jarvis_head_mesh.inc

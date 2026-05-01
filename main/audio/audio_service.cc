@@ -2,6 +2,8 @@
 #include <esp_log.h>
 #include <cstring>
 
+#include "display/jarvis_speech_meter.h"
+
 #define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)        \
     (esp_ae_rate_cvt_cfg_t)                                  \
     {                                                        \
@@ -217,7 +219,7 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
     debug_statistics_.input_count++;
 
 #if CONFIG_USE_AUDIO_DEBUGGER
-    // 音频调试：发送原始音频数据
+    // Audio debug: send raw PCM downstream
     if (audio_debugger_ == nullptr) {
         audio_debugger_ = std::make_unique<AudioDebugger>();
     }
@@ -306,6 +308,7 @@ void AudioService::AudioOutputTask() {
             codec_->EnableOutput(true);
         }
 
+        JarvisSpeechMeterFeedPlaybackPcm(task->pcm.data(), task->pcm.size(), codec_->output_channels());
         codec_->OutputData(task->pcm);
 
         /* Update the last output time */

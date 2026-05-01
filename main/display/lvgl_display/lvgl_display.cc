@@ -13,6 +13,8 @@
 #include "assets/lang_config.h"
 #include "jpg/image_to_jpeg.h"
 
+#include <ctime>
+
 #define TAG "Display"
 
 LvglDisplay::LvglDisplay() {
@@ -142,7 +144,17 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             if (tm->tm_year >= 2025 - 1900) {
                 char time_str[16];
                 strftime(time_str, sizeof(time_str), "%H:%M", tm);
+#if CONFIG_BOX3_JARVIS_HUD
+                if (jarvis_clock_label_ != nullptr) {
+                    DisplayLockGuard lock(this);
+                    lv_label_set_text(jarvis_clock_label_, time_str);
+                    last_status_update_time_ = std::chrono::system_clock::now();
+                } else {
+                    SetStatus(time_str);
+                }
+#else
                 SetStatus(time_str);
+#endif
             } else {
                 ESP_LOGW(TAG, "System time is not set, tm_year: %d", tm->tm_year);
             }

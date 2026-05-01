@@ -1,0 +1,3 @@
+# Bundled tts_server.py: OpenAI Speech -> PCM -> Opus frames (same venv as bridge + stt).
+# System: libopus (e.g. brew install opus)
+-r requirements-stt.txt

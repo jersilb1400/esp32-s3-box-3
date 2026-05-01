@@ -708,9 +708,18 @@ choice DISPLAY_STYLE
     config USE_EMOTE_MESSAGE_STYLE
         bool "Emote animation style"
         depends on BOARD_TYPE_ESP_BOX || BOARD_TYPE_ESP_BOX_3 \
-            || BOARD_TYPE_ESP_VOCAT || BOARD_TYPE_LICHUANG_DEV_S3 \
+            || BOARD_TYPE_ESP_VOCAT             || BOARD_TYPE_LICHUANG_DEV_S3 \
             || BOARD_TYPE_ESP_SENSAIRSHUTTLE
 endchoice
+
+config BOX3_JARVIS_HUD
+    bool "ESP-BOX-3 Jarvis HUD (Stark-style + dock sensor strip)"
+    default n
+    depends on BOARD_TYPE_ESP_BOX_3 && USE_DEFAULT_MESSAGE_STYLE && !USE_EMOTE_MESSAGE_STYLE
+    help
+        Cyan-on-navy HUD with dual-scanner eyes, JARVIS ONLINE + clock, and a
+        scrolling dock line: temperature/humidity (AHT20), IR receiver level,
+        and radar state (MOV/CLR/OFF).
 
 config USE_MULTILINE_CHAT_MESSAGE
     bool "Use multiline chat message display (default mode only)"

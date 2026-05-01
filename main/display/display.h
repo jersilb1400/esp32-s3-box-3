@@ -15,6 +15,18 @@
 #include <string>
 #include <chrono>
 
+/** Snapshot from ESP-BOX-3 sensor dock for optional HUD telemetry line */
+struct DockSensorHudData {
+    bool dock_present = false;
+    bool humiture_valid = false;
+    float temp_c = 0.0f;
+    float humidity_percent = 0.0f;
+    bool radar_enabled = false;
+    bool radar_presence = false;
+    /** GPIO level of IR_RX when dock_present; otherwise ignored */
+    int ir_rx_level = -1;
+};
+
 class Theme {
 public:
     Theme(const std::string& name) : name_(name) {}
@@ -40,6 +52,7 @@ public:
     virtual Theme* GetTheme() { return current_theme_; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
+    virtual void UpdateDockSensorHud(const DockSensorHudData& data);
     virtual void SetupUI() { 
         setup_ui_called_ = true;
     }

@@ -1,0 +1,6 @@
+# Local Whisper (faster-whisper) — add on top of requirements-stt.txt
+# Many platforms only ship prebuilt wheels for Python 3.10–3.12 (onnxruntime + av).
+# If install fails, use STT_ENGINE=openai and OPENAI_API_KEY instead.
+
+-r requirements-stt.txt
+faster-whisper>=1.0.0

@@ -40,7 +40,8 @@ Legacy prompts (historical):
 1. **llm-wiki vault** — default: markdown directory on Fly volume (`/data/vault`); see SPEC answers.
 2. **Existing Claude connectors** — base URLs via `fly secrets` + MCP bridge; see SPEC answers.
 3. **Spotify vs Apple Music** — Spotify primary; see SPEC answers.
-4. **Amazon Music** — dropped from scope; see SPEC answers.
+
+**Out of scope (closed):** **Amazon Music** — no public API; removed from plans (Spotify + optional Apple Music only).
 
 ## Open decisions deferred to v2
 

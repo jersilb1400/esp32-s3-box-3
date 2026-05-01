@@ -1,0 +1,51 @@
+# Merged after sdkconfig.defaults and sdkconfig.defaults.${IDF_TARGET} (see root CMakeLists.txt).
+# Espressif ESP-BOX-3 — defaults: built-in assets (so wake word + srmodels match sdkconfig),
+# English Multinet custom wake "grace" -> display "Grace", device-side AEC.
+
+# Partition table: single-app layout with ~12 MB assets to fit the
+# default asset bundle (grace Multinet model + emojis + fonts ~10 MB).
+# Overrides CONFIG_PARTITION_TABLE_CUSTOM_FILENAME from sdkconfig.defaults.
+# No OTA app partition for dual-slot updates — firmware updates are still over USB
+# if you do not use cloud OTA. OTA *check* URL is used to fetch websocket + activation config.
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_box3_xiaozhi.csv"
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
+
+# Local bridge: JSON OTA endpoint (must match your Mac LAN IP and bridge port)
+CONFIG_OTA_URL="http://192.168.4.61:8000/xiaozhi/ota/"
+
+# UI / system language — default from Kconfig.projbuild is Chinese (LANGUAGE_ZH_CN).
+# Override to English so provisioning screen, menus, and TTS prompts render in English.
+# CONFIG_LANGUAGE_ZH_CN is not set
+CONFIG_LANGUAGE_EN_US=y
+
+# Board (choice: exactly one)
+# CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI is not set
+CONFIG_BOARD_TYPE_ESP_BOX_3=y
+
+# Default chat UI (built-in assets include fonts/emojis; emote bundle was FLASH_CUSTOM before)
+# CONFIG_USE_EMOTE_MESSAGE_STYLE is not set
+# CONFIG_USE_WECHAT_MESSAGE_STYLE is not set
+CONFIG_USE_DEFAULT_MESSAGE_STYLE=y
+
+# Build assets.bin from sdkconfig (required for custom Multinet wake word index.json)
+# CONFIG_FLASH_CUSTOM_ASSETS is not set
+# CONFIG_FLASH_NONE_ASSETS is not set
+# CONFIG_FLASH_EXPRESSION_ASSETS is not set
+CONFIG_FLASH_DEFAULT_ASSETS=y
+
+# English Multinet (required for English word "grace"; see Espressif ESP-SR Kconfig)
+# CONFIG_SR_MN_EN_NONE is not set
+CONFIG_SR_MN_EN_MULTINET7_QUANT=y
+
+# Custom wake word: command string is what Multinet matches (lowercase typical for EN)
+# CONFIG_USE_AFE_WAKE_WORD is not set
+# CONFIG_USE_ESP_WAKE_WORD is not set
+# CONFIG_WAKE_WORD_DISABLED is not set
+CONFIG_USE_CUSTOM_WAKE_WORD=y
+CONFIG_CUSTOM_WAKE_WORD="jarvis"
+CONFIG_CUSTOM_WAKE_WORD_DISPLAY="Jarvis"
+CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=15
+CONFIG_WAKE_WORD_DETECTION_IN_LISTENING=y
+
+CONFIG_USE_AUDIO_PROCESSOR=y
+CONFIG_USE_DEVICE_AEC=y

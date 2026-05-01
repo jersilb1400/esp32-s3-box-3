@@ -1,4 +1,7 @@
 #include "lcd_display.h"
+#if CONFIG_BOX3_JARVIS_HUD
+#include "jarvis_artist_hud.h"
+#endif
 #include "gif/lvgl_gif.h"
 #include "settings.h"
 #include "lvgl_theme.h"
@@ -12,6 +15,7 @@
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
 #include <cstring>
+#include <cstdio>
 #include <src/misc/cache/lv_cache.h>
 
 #include "board.h"
@@ -284,6 +288,9 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 }
 
 LcdDisplay::~LcdDisplay() {
+#if CONFIG_BOX3_JARVIS_HUD
+    jarvis_artist_hud_.reset();
+#endif
     SetPreviewImage(nullptr);
     
     // Clean up GIF controller
@@ -817,8 +824,15 @@ void LcdDisplay::SetupUI() {
 
     auto screen = lv_screen_active();
     lv_obj_set_style_text_font(screen, text_font, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    const lv_color_t hud_bg = lv_color_hex(0x061018);
+    const lv_color_t hud_fg = lv_color_hex(0x4EE8FF);
+    lv_obj_set_style_text_color(screen, hud_fg, 0);
+    lv_obj_set_style_bg_color(screen, hud_bg, 0);
+#else
     lv_obj_set_style_text_color(screen, lvgl_theme->text_color(), 0);
     lv_obj_set_style_bg_color(screen, lvgl_theme->background_color(), 0);
+#endif
 
     /* Container - used as background */
     container_ = lv_obj_create(screen);
@@ -826,9 +840,31 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_radius(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_bg_color(container_, hud_bg, 0);
+    lv_obj_set_style_border_color(container_, hud_fg, 0);
+#else
     lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
     lv_obj_set_style_border_color(container_, lvgl_theme->border_color(), 0);
+#endif
 
+#if CONFIG_BOX3_JARVIS_HUD
+    /* Face / dock text removed — full-screen artist sprite HUD. Minimal stub keeps preview/timer paths alive. */
+    emoji_box_ = lv_obj_create(screen);
+    lv_obj_set_size(emoji_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(emoji_box_, 0, 0);
+    lv_obj_set_style_border_width(emoji_box_, 0, 0);
+    lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+
+    emoji_label_ = lv_label_create(emoji_box_);
+    lv_label_set_text(emoji_label_, "");
+    lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
+
+    emoji_image_ = lv_img_create(emoji_box_);
+    lv_obj_center(emoji_image_);
+    lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+#else
     /* Bottom layer: emoji_box_ - centered display */
     emoji_box_ = lv_obj_create(screen);
     lv_obj_set_size(emoji_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -845,10 +881,16 @@ void LcdDisplay::SetupUI() {
     emoji_image_ = lv_img_create(emoji_box_);
     lv_obj_center(emoji_image_);
     lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+#endif
 
     /* Middle layer: preview_image_ - centered display */
     preview_image_ = lv_image_create(screen);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_size(preview_image_, LV_HOR_RES, LV_VER_RES);
+    lv_image_set_inner_align(preview_image_, LV_IMAGE_ALIGN_COVER);
+#else
     lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
+#endif
     lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
 
@@ -856,8 +898,13 @@ void LcdDisplay::SetupUI() {
     top_bar_ = lv_obj_create(screen);
     lv_obj_set_size(top_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
     lv_obj_set_style_radius(top_bar_, 0, 0);
-    lv_obj_set_style_bg_opa(top_bar_, LV_OPA_50, 0);  // 50% opacity background
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_bg_opa(top_bar_, LV_OPA_COVER, 0);  /* opaque: no bleed-through over eyes */
+    lv_obj_set_style_bg_color(top_bar_, hud_bg, 0);
+#else
+    lv_obj_set_style_bg_opa(top_bar_, LV_OPA_50, 0);
     lv_obj_set_style_bg_color(top_bar_, lvgl_theme->background_color(), 0);
+#endif
     lv_obj_set_style_border_width(top_bar_, 0, 0);
     lv_obj_set_style_pad_all(top_bar_, 0, 0);
     lv_obj_set_style_pad_top(top_bar_, lvgl_theme->spacing(2), 0);
@@ -865,15 +912,38 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_left(top_bar_, lvgl_theme->spacing(4), 0);
     lv_obj_set_style_pad_right(top_bar_, lvgl_theme->spacing(4), 0);
     lv_obj_set_flex_flow(top_bar_, LV_FLEX_FLOW_ROW);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_flex_align(top_bar_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(top_bar_, 8, LV_PART_MAIN);
+#else
     lv_obj_set_flex_align(top_bar_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+#endif
     lv_obj_set_scrollbar_mode(top_bar_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Left icon
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_t* brand = lv_label_create(top_bar_);
+    lv_label_set_text(brand, "JARVIS ONLINE");
+    lv_obj_set_style_text_font(brand, text_font, 0);
+    lv_obj_set_style_text_color(brand, hud_fg, 0);
+    lv_obj_set_style_margin_right(brand, lvgl_theme->spacing(6), 0);
+
+    lv_obj_t* top_spacer = lv_obj_create(top_bar_);
+    lv_obj_set_flex_grow(top_spacer, 1);
+    lv_obj_set_style_bg_opa(top_spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(top_spacer, 0, 0);
+
+    jarvis_clock_label_ = lv_label_create(top_bar_);
+    lv_label_set_text(jarvis_clock_label_, "--:--");
+    lv_obj_set_style_text_font(jarvis_clock_label_, text_font, 0);
+    lv_obj_set_style_text_color(jarvis_clock_label_, hud_fg, 0);
+    lv_obj_set_style_margin_right(jarvis_clock_label_, lvgl_theme->spacing(4), 0);
+#else
     network_label_ = lv_label_create(top_bar_);
     lv_label_set_text(network_label_, "");
     lv_obj_set_style_text_font(network_label_, icon_font, 0);
     lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
+#endif
 
     // Right icons container
     lv_obj_t* right_icons = lv_obj_create(top_bar_);
@@ -883,16 +953,35 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_all(right_icons, 0, 0);
     lv_obj_set_flex_flow(right_icons, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right_icons, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_pad_column(right_icons, 10, LV_PART_MAIN);
+#endif
+
+#if CONFIG_BOX3_JARVIS_HUD
+    network_label_ = lv_label_create(right_icons);
+    lv_label_set_text(network_label_, "");
+    lv_obj_set_style_text_font(network_label_, icon_font, 0);
+    lv_obj_set_style_text_color(network_label_, hud_fg, 0);
+    lv_obj_set_style_margin_right(network_label_, lvgl_theme->spacing(2), 0);
+#endif
 
     mute_label_ = lv_label_create(right_icons);
     lv_label_set_text(mute_label_, "");
     lv_obj_set_style_text_font(mute_label_, icon_font, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_text_color(mute_label_, hud_fg, 0);
+#else
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
+#endif
 
     battery_label_ = lv_label_create(right_icons);
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, icon_font, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_text_color(battery_label_, hud_fg, 0);
+#else
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
+#endif
     lv_obj_set_style_margin_left(battery_label_, lvgl_theme->spacing(2), 0);
 
     /* Layer 2: Status bar - for center text labels */
@@ -911,7 +1000,11 @@ void LcdDisplay::SetupUI() {
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_width(notification_label_, LV_HOR_RES * 0.75);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_text_color(notification_label_, hud_fg, 0);
+#else
     lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
+#endif
     lv_label_set_text(notification_label_, "");
     lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
@@ -920,7 +1013,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_width(status_label_, LV_HOR_RES * 0.75);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_text_color(status_label_, hud_fg, 0);
+#else
     lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
+#endif
     lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
     lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
 
@@ -930,8 +1027,13 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_width(bottom_bar_, LV_HOR_RES);
     lv_obj_set_height(bottom_bar_, LV_SIZE_CONTENT);
     lv_obj_set_style_radius(bottom_bar_, 0, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_bg_color(bottom_bar_, hud_bg, 0);
+    lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_70, 0);
+#else
     lv_obj_set_style_bg_color(bottom_bar_, lvgl_theme->background_color(), 0);
     lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_50, 0);
+#endif
     lv_obj_set_style_text_color(bottom_bar_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_pad_all(bottom_bar_, lvgl_theme->spacing(4), 0);
     lv_obj_set_style_border_width(bottom_bar_, 0, 0);
@@ -941,10 +1043,16 @@ void LcdDisplay::SetupUI() {
     /* chat_message_label_ placed in bottom_bar_, multiline wrapped display */
     chat_message_label_ = lv_label_create(bottom_bar_);
     lv_label_set_text(chat_message_label_, "");
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_width(chat_message_label_, LV_HOR_RES - 8);
+    lv_obj_set_style_text_color(chat_message_label_, hud_fg, 0);
+    lv_obj_set_style_text_line_space(chat_message_label_, 0, 0);
+#else
     lv_obj_set_width(chat_message_label_, LV_HOR_RES - lvgl_theme->spacing(8));
+    lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
+#endif
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
     lv_obj_align(chat_message_label_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);  // Hide until there is content
 #else
@@ -952,7 +1060,12 @@ void LcdDisplay::SetupUI() {
     bottom_bar_ = lv_obj_create(screen);
     lv_obj_set_size(bottom_bar_, LV_HOR_RES, text_font->line_height + lvgl_theme->spacing(8));
     lv_obj_set_style_radius(bottom_bar_, 0, 0);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_style_bg_color(bottom_bar_, hud_bg, 0);
+    lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_70, 0);
+#else
     lv_obj_set_style_bg_color(bottom_bar_, lvgl_theme->background_color(), 0);
+#endif
     lv_obj_set_style_text_color(bottom_bar_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_pad_all(bottom_bar_, 0, 0);
     lv_obj_set_style_pad_left(bottom_bar_, lvgl_theme->spacing(4), 0);
@@ -964,10 +1077,16 @@ void LcdDisplay::SetupUI() {
     /* chat_message_label_ placed in bottom_bar_, single-line horizontal scroll */
     chat_message_label_ = lv_label_create(bottom_bar_);
     lv_label_set_text(chat_message_label_, "");
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_obj_set_width(chat_message_label_, LV_HOR_RES - 8);
+    lv_obj_set_style_text_color(chat_message_label_, hud_fg, 0);
+    lv_obj_set_style_text_line_space(chat_message_label_, 0, 0);
+#else
     lv_obj_set_width(chat_message_label_, LV_HOR_RES - lvgl_theme->spacing(8));
+    lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
+#endif
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
     lv_obj_align(chat_message_label_, LV_ALIGN_CENTER, 0, 0);
 
     // Start scrolling after a delay (short text won't scroll)
@@ -992,6 +1111,68 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
     lv_obj_center(low_battery_label_);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+
+#if CONFIG_BOX3_JARVIS_HUD
+    jarvis_artist_hud_ = std::make_unique<JarvisArtistHud>();
+    if (!jarvis_artist_hud_->Create(screen, LV_HOR_RES, LV_VER_RES)) {
+        ESP_LOGW(TAG, "Jarvis artist HUD failed — no face overlay");
+        jarvis_artist_hud_.reset();
+    } else if (jarvis_artist_hud_->Overlay() != nullptr) {
+        lv_obj_move_foreground(jarvis_artist_hud_->Overlay());
+        lv_obj_move_foreground(preview_image_);
+        lv_obj_move_foreground(low_battery_popup_);
+    }
+    lv_obj_add_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+#endif
+}
+
+void LcdDisplay::UpdateDockSensorHud(const DockSensorHudData& d) {
+#if CONFIG_BOX3_JARVIS_HUD
+    if (jarvis_dock_sensor_label_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    char line[288];
+    if (!d.dock_present) {
+        snprintf(line, sizeof(line),
+            "DOCK  not connected\n"
+            "TEMP  -- °C  ·  -- °F\n"
+            "RH    --\n"
+            "IR RX unavailable\n"
+            "RADAR unavailable");
+    } else {
+        char tline[96];
+        char rhline[48];
+        if (d.humiture_valid) {
+            int tc = (int)(d.temp_c >= 0.0f ? d.temp_c + 0.5f : d.temp_c - 0.5f);
+            int tf = (int)(d.temp_c * 9.0f / 5.0f + 32.0f + (d.temp_c >= 0 ? 0.5f : -0.5f));
+            int rh = (int)(d.humidity_percent + 0.5f);
+            snprintf(tline, sizeof(tline), "TEMP  %d °C  ·  %d °F", tc, tf);
+            snprintf(rhline, sizeof(rhline), "RH    %d %%", rh);
+        } else {
+            snprintf(tline, sizeof(tline), "TEMP  -- °C  ·  -- °F");
+            snprintf(rhline, sizeof(rhline), "RH    --");
+        }
+        const char* ir_txt = (d.ir_rx_level < 0) ? "IR RX unavailable"
+                                                  : (d.ir_rx_level ? "IR RX HIGH"
+                                                                   : "IR RX LOW");
+        const char* rad_txt = !d.radar_enabled ? "RADAR DISABLED"
+                                                  : (d.radar_presence ? "RADAR MOTION"
+                                                                      : "RADAR CLEAR");
+        snprintf(line, sizeof(line),
+            "DOCK  connected\n"
+            "%s\n"
+            "%s\n"
+            "%s\n"
+            "%s",
+            tline, rhline, ir_txt, rad_txt);
+    }
+    lv_label_set_text(jarvis_dock_sensor_label_, line);
+#else
+    (void)d;
+#endif
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -1003,7 +1184,14 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
 
     if (image == nullptr) {
         esp_timer_stop(preview_timer_);
+#if CONFIG_BOX3_JARVIS_HUD
+        if (jarvis_artist_hud_) {
+            jarvis_artist_hud_->SetPaused(false);
+        }
+        lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+#else
         lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+#endif
         lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
         preview_image_cached_.reset();
         if (gif_controller_) {
@@ -1012,13 +1200,23 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
         return;
     }
 
+#if CONFIG_BOX3_JARVIS_HUD
+    if (jarvis_artist_hud_) {
+        jarvis_artist_hud_->SetPaused(true);
+    }
+#endif
+
     preview_image_cached_ = std::move(image);
     auto img_dsc = preview_image_cached_->image_dsc();
     lv_image_set_src(preview_image_, img_dsc);
+#if CONFIG_BOX3_JARVIS_HUD
+    lv_image_set_inner_align(preview_image_, LV_IMAGE_ALIGN_COVER);
+#else
     if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
         // zoom factor 0.5
         lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
     }
+#endif
 
     // Hide emoji_box_
     if (gif_controller_) {
@@ -1072,6 +1270,10 @@ void LcdDisplay::ClearChatMessages() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
+#if CONFIG_BOX3_JARVIS_HUD
+    (void)emotion;
+    return;
+#endif
     if (!setup_ui_called_) {
         ESP_LOGW(TAG, "SetEmotion('%s') called before SetupUI() - emotion will not be displayed!", emotion);
     }
@@ -1184,10 +1386,15 @@ void LcdDisplay::SetTheme(Theme* theme) {
         lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
     }
     
-    // Update top bar background color with 50% opacity
+    // Update top bar background
     if (top_bar_ != nullptr) {
+#if CONFIG_BOX3_JARVIS_HUD
+        lv_obj_set_style_bg_opa(top_bar_, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(top_bar_, lv_color_hex(0x061018), 0);
+#else
         lv_obj_set_style_bg_opa(top_bar_, LV_OPA_50, 0);
         lv_obj_set_style_bg_color(top_bar_, lvgl_theme->background_color(), 0);
+#endif
     }
     
     // Update status bar elements
@@ -1269,21 +1476,31 @@ void LcdDisplay::SetTheme(Theme* theme) {
     }
 #else
     // Simple UI mode - just update the main chat message
+#if CONFIG_BOX3_JARVIS_HUD
+    if (chat_message_label_ != nullptr) {
+        lv_obj_set_style_text_color(chat_message_label_, lv_color_hex(0x4EE8FF), 0);
+    }
+    if (bottom_bar_ != nullptr) {
+        lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_70, 0);
+        lv_obj_set_style_bg_color(bottom_bar_, lv_color_hex(0x061018), 0);
+    }
+#else
     if (chat_message_label_ != nullptr) {
         lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
     }
-    
-    if (emoji_label_ != nullptr) {
-        lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
-    }
-    
+
     // Update bottom bar background color with 50% opacity
     if (bottom_bar_ != nullptr) {
         lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_50, 0);
         lv_obj_set_style_bg_color(bottom_bar_, lvgl_theme->background_color(), 0);
     }
 #endif
-    
+
+    if (emoji_label_ != nullptr) {
+        lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+    }
+#endif
+
     // Update low battery popup
     lv_obj_set_style_bg_color(low_battery_popup_, lvgl_theme->low_battery_color(), 0);
 

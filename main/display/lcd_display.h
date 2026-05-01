@@ -13,6 +13,9 @@
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
+#if CONFIG_BOX3_JARVIS_HUD
+class JarvisArtistHud;
+#endif
 
 class LcdDisplay : public LvglDisplay {
 protected:
@@ -35,6 +38,10 @@ protected:
     esp_timer_handle_t preview_timer_ = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
+    lv_obj_t* jarvis_dock_sensor_label_ = nullptr;
+#if CONFIG_BOX3_JARVIS_HUD
+    std::unique_ptr<JarvisArtistHud> jarvis_artist_hud_;
+#endif
 
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
@@ -56,6 +63,7 @@ public:
     
     // Set whether to hide chat messages/subtitles
     void SetHideSubtitle(bool hide);
+    virtual void UpdateDockSensorHud(const DockSensorHudData& data) override;
 };
 
 // SPI LCD display

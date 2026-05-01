@@ -36,7 +36,11 @@ protected:
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* low_battery_popup_ = nullptr;
     lv_obj_t* low_battery_label_ = nullptr;
-    
+#if CONFIG_BOX3_JARVIS_HUD
+    /** Top bar clock when BOX3 Jarvis HUD is active (otherwise idle time uses status_label_) */
+    lv_obj_t *jarvis_clock_label_ = nullptr;
+#endif
+
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
