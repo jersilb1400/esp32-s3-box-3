@@ -14,7 +14,7 @@
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
 #if CONFIG_BOX3_JARVIS_HUD
-class JarvisArtistHud;
+class JarvisPointCloud;
 #endif
 
 class LcdDisplay : public LvglDisplay {
@@ -40,7 +40,7 @@ protected:
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
     lv_obj_t* jarvis_dock_sensor_label_ = nullptr;
 #if CONFIG_BOX3_JARVIS_HUD
-    std::unique_ptr<JarvisArtistHud> jarvis_artist_hud_;
+    std::unique_ptr<JarvisPointCloud> jarvis_point_cloud_;
 #endif
 
     void InitializeLcdThemes();

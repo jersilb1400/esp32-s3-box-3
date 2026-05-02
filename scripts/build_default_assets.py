@@ -606,17 +606,27 @@ def read_custom_wake_word_from_sdkconfig(sdkconfig_path):
                     except ValueError:
                         print(f"Warning: Invalid threshold value: {value}")
                         config_values['threshold'] = 20  # default (will be converted to 0.2)
+            elif 'CONFIG_CUSTOM_SLEEP_WORD=' in line and not line.startswith('#'):
+                config_values['sleep_word'] = line.split('=', 1)[1].strip('"')
+            elif 'CONFIG_CUSTOM_SLEEP_WORD_DISPLAY=' in line and not line.startswith('#'):
+                config_values['sleep_display'] = line.split('=', 1)[1].strip('"')
     
-    # Return config only if custom wake word is enabled and required fields are present
     if (config_values.get('use_custom_wake_word', False) and 
         'wake_word' in config_values and 
         'display' in config_values and 
         'threshold' in config_values):
-        return {
+
+        wake_cfg = {
             'wake_word': config_values['wake_word'],
             'display': config_values['display'],
             'threshold': config_values['threshold'] / 100.0  # Convert to decimal (20 -> 0.2)
         }
+
+        sleep_word = config_values.get('sleep_word', 'go to sleep')
+        sleep_display = config_values.get('sleep_display', 'Sleep mode')
+        wake_cfg['sleep_word'] = sleep_word
+        wake_cfg['sleep_display'] = sleep_display
+        return wake_cfg
     
     return None
 
@@ -903,10 +913,16 @@ def main():
                     "command": custom_wake_word_config['wake_word'],
                     "text": custom_wake_word_config['display'],
                     "action": "wake"
+                },
+                {
+                    "command": custom_wake_word_config['sleep_word'],
+                    "text": custom_wake_word_config['sleep_display'],
+                    "action": "sleep"
                 }
             ]
         }
         print(f"  custom wake word: {custom_wake_word_config['wake_word']} ({custom_wake_word_config['display']})")
+        print(f"  sleep command: {custom_wake_word_config['sleep_word']} ({custom_wake_word_config['sleep_display']})")
         print(f"  wake word language: {language}")
         print(f"  wake word threshold: {custom_wake_word_config['threshold']}")
     

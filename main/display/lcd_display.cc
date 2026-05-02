@@ -1,6 +1,6 @@
 #include "lcd_display.h"
 #if CONFIG_BOX3_JARVIS_HUD
-#include "jarvis_artist_hud.h"
+#include "jarvis_point_cloud.h"
 #endif
 #include "gif/lvgl_gif.h"
 #include "settings.h"
@@ -289,7 +289,7 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 
 LcdDisplay::~LcdDisplay() {
 #if CONFIG_BOX3_JARVIS_HUD
-    jarvis_artist_hud_.reset();
+    jarvis_point_cloud_.reset();
 #endif
     SetPreviewImage(nullptr);
     
@@ -849,7 +849,7 @@ void LcdDisplay::SetupUI() {
 #endif
 
 #if CONFIG_BOX3_JARVIS_HUD
-    /* Face / dock text removed — full-screen artist sprite HUD. Minimal stub keeps preview/timer paths alive. */
+    /* Face / dock text removed — only full-screen JarvisPointCloud visible. Minimal stub keeps preview/timer paths alive. */
     emoji_box_ = lv_obj_create(screen);
     lv_obj_set_size(emoji_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
@@ -1113,12 +1113,12 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
 
 #if CONFIG_BOX3_JARVIS_HUD
-    jarvis_artist_hud_ = std::make_unique<JarvisArtistHud>();
-    if (!jarvis_artist_hud_->Create(screen, LV_HOR_RES, LV_VER_RES)) {
-        ESP_LOGW(TAG, "Jarvis artist HUD failed — no face overlay");
-        jarvis_artist_hud_.reset();
-    } else if (jarvis_artist_hud_->Overlay() != nullptr) {
-        lv_obj_move_foreground(jarvis_artist_hud_->Overlay());
+    jarvis_point_cloud_ = std::make_unique<JarvisPointCloud>();
+    if (!jarvis_point_cloud_->Create(screen, LV_HOR_RES, LV_VER_RES)) {
+        ESP_LOGW(TAG, "Jarvis point cloud allocation failed — no mesh overlay");
+        jarvis_point_cloud_.reset();
+    } else if (jarvis_point_cloud_->Canvas() != nullptr) {
+        lv_obj_move_foreground(jarvis_point_cloud_->Canvas());
         lv_obj_move_foreground(preview_image_);
         lv_obj_move_foreground(low_battery_popup_);
     }
@@ -1185,8 +1185,8 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     if (image == nullptr) {
         esp_timer_stop(preview_timer_);
 #if CONFIG_BOX3_JARVIS_HUD
-        if (jarvis_artist_hud_) {
-            jarvis_artist_hud_->SetPaused(false);
+        if (jarvis_point_cloud_) {
+            jarvis_point_cloud_->SetPaused(false);
         }
         lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
 #else
@@ -1201,8 +1201,8 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     }
 
 #if CONFIG_BOX3_JARVIS_HUD
-    if (jarvis_artist_hud_) {
-        jarvis_artist_hud_->SetPaused(true);
+    if (jarvis_point_cloud_) {
+        jarvis_point_cloud_->SetPaused(true);
     }
 #endif
 

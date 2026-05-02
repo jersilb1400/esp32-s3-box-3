@@ -769,7 +769,10 @@ config CUSTOM_WAKE_WORD
     default "xiao tu dou"
     depends on USE_CUSTOM_WAKE_WORD
     help
-        Custom Wake Word, use pinyin for Chinese, separated by spaces
+        Custom wake phrase for Multinet. For Chinese, use pinyin with spaces between syllables.
+        For English Multinet models, use a short lowercase phrase (e.g. "jarvis"); train/rebuild assets
+        to match Multinet phoneme coverage. Tune CUSTOM_WAKE_WORD_THRESHOLD if you get misses (lower)
+        or false triggers (higher).
 
 config CUSTOM_WAKE_WORD_DISPLAY
     string "Custom Wake Word Display"
@@ -802,6 +805,41 @@ config WAKE_WORD_DETECTION_IN_LISTENING
         When enabled, the device can detect wake word during listening,
         which allows interrupting the current conversation.
         When disabled (default), wake word detection is turned off during listening.
+
+config CUSTOM_SLEEP_WORD
+    string "Jarvis Multinet sleep command phrase"
+    default "go to sleep"
+    depends on USE_CUSTOM_WAKE_WORD
+    help
+        Local Multinet command with action \"sleep\" that hangs up and enters sleep standby until the wake phrase is spoken again.
+        Regenerate default assets after changing.
+
+config CUSTOM_SLEEP_WORD_DISPLAY
+    string "Jarvis Multinet sleep display label"
+    default "Going to sleep"
+    depends on USE_CUSTOM_WAKE_WORD
+    help
+        Friendly label surfaced in notifications after the sleep phrase fires.
+
+config JARVIS_WAKE_ONLY_CHAT
+    bool "Require wake phrase to start chats from idle"
+    default n
+    depends on USE_AFE_WAKE_WORD || USE_CUSTOM_WAKE_WORD
+    help
+        Prevents BOOT/toggle/start-listening from opening a websocket session unless the wake phrase is used first.
+
+config JARVIS_SILENCE_END_SESSION_SEC
+    int "Auto-close session after silence while listening (sec, 0=off)"
+    range 0 120
+    default 12
+    help
+        When non-zero, restarts an idle countdown each time mic VAD returns to silence during listening mode.
+
+config JARVIS_SPEAKER_VERIFY_HELLO
+    bool "Expose speaker_verify feature flag in websocket hello"
+    default n
+    help
+        Sends features.speaker_verify=true for optional speaker embedding checks on jarvis-server (see contrib module).
 
 config USE_AUDIO_PROCESSOR
     bool "Enable Audio Noise Reduction"

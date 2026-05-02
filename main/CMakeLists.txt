@@ -15,7 +15,7 @@ set(SOURCES "audio/audio_codec.cc"
             "led/gpio_led.cc"
             "display/display.cc"
             "display/lcd_display.cc"
-            "display/jarvis_artist_hud.cc"
+            "display/jarvis_point_cloud.cc"
             "display/jarvis_speech_meter.cc"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
@@ -967,9 +967,6 @@ if(CONFIG_BOARD_TYPE_ESP_VOCAT)
         espressif__touch_button_sensor
     )
 endif()
-
-# RGB565 face bitmap for Jarvis HUD (generated at CMake configure — see root CMakeLists.txt).
-list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/jarvis_hud/generated/jarvis_artist_face_data.c")
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}

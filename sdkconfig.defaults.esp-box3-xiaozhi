@@ -1,6 +1,6 @@
 # Merged after sdkconfig.defaults and sdkconfig.defaults.${IDF_TARGET} (see root CMakeLists.txt).
 # Espressif ESP-BOX-3 — defaults: built-in assets (so wake word + srmodels match sdkconfig),
-# English Multinet custom wake "grace" -> display "Grace", device-side AEC.
+# English Multinet custom wake "jarvis" -> display "Jarvis", device-side AEC.
 
 # Partition table: single-app layout with ~12 MB assets to fit the
 # default asset bundle (grace Multinet model + emojis + fonts ~10 MB).
@@ -34,7 +34,7 @@ CONFIG_BOX3_JARVIS_HUD=y
 # CONFIG_FLASH_EXPRESSION_ASSETS is not set
 CONFIG_FLASH_DEFAULT_ASSETS=y
 
-# English Multinet (required for English word "grace"; see Espressif ESP-SR Kconfig)
+# English Multinet (required for English custom commands; see Espressif ESP-SR Kconfig)
 # CONFIG_SR_MN_EN_NONE is not set
 CONFIG_SR_MN_EN_MULTINET7_QUANT=y
 
@@ -45,8 +45,19 @@ CONFIG_SR_MN_EN_MULTINET7_QUANT=y
 CONFIG_USE_CUSTOM_WAKE_WORD=y
 CONFIG_CUSTOM_WAKE_WORD="jarvis"
 CONFIG_CUSTOM_WAKE_WORD_DISPLAY="Jarvis"
-CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=15
+# Multinet threshold: lower = more sensitive (more false wakes). Espressif default is 20.
+CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=20
 CONFIG_WAKE_WORD_DETECTION_IN_LISTENING=y
+
+# Local sleep phrase ends the websocket session until "jarvis" is spoken again
+CONFIG_CUSTOM_SLEEP_WORD="go to sleep"
+CONFIG_CUSTOM_SLEEP_WORD_DISPLAY="Sleep mode"
+
+# Idle BOOT/toggle cannot open websocket — only wake phrase can (see docs/JARVIS_VOICE.md)
+CONFIG_JARVIS_WAKE_ONLY_CHAT=y
+
+# Seconds of microphone silence during listening before auto hang-up (0 disables)
+CONFIG_JARVIS_SILENCE_END_SESSION_SEC=12
 
 CONFIG_USE_AUDIO_PROCESSOR=y
 CONFIG_USE_DEVICE_AEC=y

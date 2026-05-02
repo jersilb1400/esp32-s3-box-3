@@ -8,6 +8,7 @@
 #include <cJSON.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
+#include <sdkconfig.h>
 #include "assets/lang_config.h"
 
 #define TAG "WS"
@@ -206,8 +207,8 @@ std::string WebsocketProtocol::GetHelloMessage() {
     cJSON_AddStringToObject(root, "type", "hello");
     cJSON_AddNumberToObject(root, "version", version_);
     cJSON* features = cJSON_CreateObject();
-#if CONFIG_USE_SERVER_AEC
-    cJSON_AddBoolToObject(features, "aec", true);
+#if CONFIG_JARVIS_SPEAKER_VERIFY_HELLO
+    cJSON_AddBoolToObject(features, "speaker_verify", true);
 #endif
     cJSON_AddBoolToObject(features, "mcp", true);
     cJSON_AddItemToObject(root, "features", features);

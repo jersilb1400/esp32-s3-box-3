@@ -92,6 +92,9 @@ bool CustomWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) 
 #ifdef CONFIG_CUSTOM_WAKE_WORD
         threshold_ = CONFIG_CUSTOM_WAKE_WORD_THRESHOLD / 100.0f;
         commands_.push_back({CONFIG_CUSTOM_WAKE_WORD, CONFIG_CUSTOM_WAKE_WORD_DISPLAY, "wake"});
+#ifdef CONFIG_CUSTOM_SLEEP_WORD
+        commands_.push_back({CONFIG_CUSTOM_SLEEP_WORD, CONFIG_CUSTOM_SLEEP_WORD_DISPLAY, "sleep"});
+#endif
 #endif
     } else {
         models_ = models_list;
@@ -130,6 +133,10 @@ bool CustomWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) 
 
 void CustomWakeWord::OnWakeWordDetected(std::function<void(const std::string& wake_word)> callback) {
     wake_word_detected_callback_ = callback;
+}
+
+void CustomWakeWord::SetSleepWordHandler(std::function<void(const std::string& display_label)> handler) {
+    sleep_word_detected_callback_ = handler;
 }
 
 void CustomWakeWord::Start() {
@@ -172,19 +179,31 @@ void CustomWakeWord::Feed(const std::vector<int16_t>& data) {
         
         if (mn_state == ESP_MN_STATE_DETECTED) {
             esp_mn_results_t *mn_result = multinet_->get_results(multinet_model_data_);
+            if (mn_result != nullptr && mn_result->num > 0) {
             for (int i = 0; i < mn_result->num && running_; i++) {
-                ESP_LOGI(TAG, "Custom wake word detected: command_id=%d, string=%s, prob=%f", 
+                ESP_LOGI(TAG, "Speech command: command_id=%d, string=%s, prob=%f",
                         mn_result->command_id[i], mn_result->string, mn_result->prob[i]);
+                if (mn_result->command_id[i] <= 0 ||
+                    mn_result->command_id[i] > static_cast<int>(commands_.size())) {
+                    continue;
+                }
                 auto& command = commands_[mn_result->command_id[i] - 1];
                 if (command.action == "wake") {
                     last_detected_wake_word_ = command.text;
                     running_ = false;
                     input_buffer_.clear();
-                    
+
                     if (wake_word_detected_callback_) {
                         wake_word_detected_callback_(last_detected_wake_word_);
                     }
+                } else if (command.action == "sleep") {
+                    running_ = false;
+                    input_buffer_.clear();
+                    if (sleep_word_detected_callback_) {
+                        sleep_word_detected_callback_(command.text);
+                    }
                 }
+            }
             }
             multinet_->clean(multinet_model_data_);
         } else if (mn_state == ESP_MN_STATE_TIMEOUT) {

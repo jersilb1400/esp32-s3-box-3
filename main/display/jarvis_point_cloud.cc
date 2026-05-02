@@ -19,7 +19,7 @@ struct HeadMeshRawPt {
     float shade;
 };
 
-/** Matches jarvis_hud/tools/gen_jarvis_head_mesh.py; uses stack arrays only (no STL alloc) for robust boot on S3/Core boards. */
+/** Matches scripts/gen_jarvis_head_mesh.py; uses stack arrays only (no STL alloc) for robust boot on S3/Core boards. */
 int BuildGenericMaleHeadMesh(float* out_x, float* out_y, uint8_t* out_shade, int k_target) {
     constexpr int kRawMax = 420;
     constexpr int kChosenMax = 168;

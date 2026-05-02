@@ -31,6 +31,8 @@
 #define MAIN_EVENT_START_LISTENING      (1 << 10)
 #define MAIN_EVENT_STOP_LISTENING       (1 << 11)
 #define MAIN_EVENT_STATE_CHANGED        (1 << 12)
+#define MAIN_EVENT_SLEEP_WORD           (1 << 13)
+#define MAIN_EVENT_LISTEN_SILENCE       (1 << 14)
 
 
 enum AecMode {
@@ -142,6 +144,8 @@ private:
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
+    bool voice_sleep_standby_engaged_ = false;
+    esp_timer_handle_t listen_silence_timer_handle_ = nullptr;
 
 
     // Event handlers
@@ -153,6 +157,11 @@ private:
     void HandleNetworkDisconnectedEvent();
     void HandleActivationDoneEvent();
     void HandleWakeWordDetectedEvent();
+    void HandleSleepWordEvent();
+    void HandleListenSilenceTimeout();
+    void EnterVoiceSleep();
+    void LoadVoiceAssistState();
+    void RestartListenSilenceTimer();
     void ContinueOpenAudioChannel(ListeningMode mode);
     void ContinueWakeWordInvoke(const std::string& wake_word);
 

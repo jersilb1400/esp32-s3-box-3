@@ -60,6 +60,10 @@ VOICE DELIVERY:
 
 ---
 
+## Firmware voice path (wake, Opus, AEC)
+
+See **[JARVIS_VOICE.md](JARVIS_VOICE.md)** for OTA/WebSocket contract, wake-word Kconfig tuning, device vs server AEC, and a short bring-up checklist.
+
 ## Notes
 
 - The ESP32 device currently cannot force a specific cloud TTS voice from firmware alone.

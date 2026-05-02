@@ -17,6 +17,8 @@
 #include <arpa/inet.h>
 #include <font_awesome.h>
 
+#include <sdkconfig.h>
+
 #define TAG "Application"
 
 
@@ -44,9 +46,30 @@ Application::Application() {
         .skip_unhandled_events = true
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+    esp_timer_create_args_t listen_silence_args = {
+        .callback = [](void* arg) {
+            Application* app = static_cast<Application*>(arg);
+            xEventGroupSetBits(app->event_group_, MAIN_EVENT_LISTEN_SILENCE);
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "listen_silence",
+        .skip_unhandled_events = false,
+    };
+    esp_timer_create(&listen_silence_args, &listen_silence_timer_handle_);
+#endif
 }
 
 Application::~Application() {
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+    if (listen_silence_timer_handle_ != nullptr) {
+        esp_timer_stop(listen_silence_timer_handle_);
+        esp_timer_delete(listen_silence_timer_handle_);
+        listen_silence_timer_handle_ = nullptr;
+    }
+#endif
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
@@ -60,6 +83,7 @@ bool Application::SetDeviceState(DeviceState state) {
 
 void Application::Initialize() {
     auto& board = Board::GetInstance();
+    LoadVoiceAssistState();
     SetDeviceState(kDeviceStateStarting);
 
     // Setup the display
@@ -80,10 +104,19 @@ void Application::Initialize() {
     callbacks.on_wake_word_detected = [this](const std::string& wake_word) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_WAKE_WORD_DETECTED);
     };
+    callbacks.on_sleep_word_detected = [this](const std::string& /*phrase*/) {
+        xEventGroupSetBits(event_group_, MAIN_EVENT_SLEEP_WORD);
+    };
     callbacks.on_vad_change = [this](bool speaking) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_VAD_CHANGE);
     };
     audio_service_.SetCallbacks(callbacks);
+
+#if CONFIG_USE_DEVICE_AEC
+    audio_service_.EnableDeviceAec(true);
+#elif CONFIG_USE_SERVER_AEC
+    audio_service_.EnableDeviceAec(false);
+#endif
 
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
@@ -170,6 +203,8 @@ void Application::Run() {
         MAIN_EVENT_SCHEDULE |
         MAIN_EVENT_SEND_AUDIO |
         MAIN_EVENT_WAKE_WORD_DETECTED |
+        MAIN_EVENT_SLEEP_WORD |
+        MAIN_EVENT_LISTEN_SILENCE |
         MAIN_EVENT_VAD_CHANGE |
         MAIN_EVENT_CLOCK_TICK |
         MAIN_EVENT_ERROR |
@@ -229,8 +264,19 @@ void Application::Run() {
             HandleWakeWordDetectedEvent();
         }
 
+        if (bits & MAIN_EVENT_SLEEP_WORD) {
+            HandleSleepWordEvent();
+        }
+
+        if (bits & MAIN_EVENT_LISTEN_SILENCE) {
+            HandleListenSilenceTimeout();
+        }
+
         if (bits & MAIN_EVENT_VAD_CHANGE) {
             if (GetDeviceState() == kDeviceStateListening) {
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+                RestartListenSilenceTimer();
+#endif
                 auto led = Board::GetInstance().GetLed();
                 led->OnStateChanged();
             }
@@ -572,6 +618,27 @@ void Application::InitializeProtocol() {
             if (cJSON_IsObject(payload)) {
                 McpServer::GetInstance().ParseMessage(payload);
             }
+        } else if (strcmp(type->valuestring, "session") == 0) {
+            auto command = cJSON_GetObjectItem(root, "command");
+            if (cJSON_IsString(command)) {
+                ESP_LOGI(TAG, "Session command: %s", command->valuestring);
+                if (strcmp(command->valuestring, "voice_sleep") == 0 ||
+                    strcmp(command->valuestring, "sleep") == 0) {
+                    Schedule([this]() {
+                        EnterVoiceSleep();
+                    });
+                } else if (strcmp(command->valuestring, "end") == 0 ||
+                           strcmp(command->valuestring, "close") == 0) {
+                    Schedule([this]() {
+                        if (protocol_ && protocol_->IsAudioChannelOpened()) {
+                            protocol_->SendStopListening();
+                            protocol_->CloseAudioChannel();
+                        }
+                    });
+                } else {
+                    ESP_LOGW(TAG, "Unknown session command: %s", command->valuestring);
+                }
+            }
         } else if (strcmp(type->valuestring, "system") == 0) {
             auto command = cJSON_GetObjectItem(root, "command");
             if (cJSON_IsString(command)) {
@@ -658,7 +725,7 @@ void Application::Alert(const char* status, const char* message, const char* emo
 void Application::DismissAlert() {
     if (GetDeviceState() == kDeviceStateIdle) {
         auto display = Board::GetInstance().GetDisplay();
-        display->SetStatus(Lang::Strings::STANDBY);
+        display->SetStatus(voice_sleep_standby_engaged_ ? Lang::Strings::VOICE_SLEEP_STANDBY : Lang::Strings::STANDBY);
         display->SetEmotion("neutral");
         display->SetChatMessage("system", "");
     }
@@ -698,6 +765,13 @@ void Application::HandleToggleChatEvent() {
     }
 
     if (state == kDeviceStateIdle) {
+#if CONFIG_JARVIS_WAKE_ONLY_CHAT
+        {
+            auto display = Board::GetInstance().GetDisplay();
+            display->ShowNotification(Lang::Strings::WAKE_ONLY_USE_WAKE_WORD, 5000);
+        }
+        return;
+#endif
         ListeningMode mode = GetDefaultListeningMode();
         if (!protocol_->IsAudioChannelOpened()) {
             SetDeviceState(kDeviceStateConnecting);
@@ -748,6 +822,13 @@ void Application::HandleStartListeningEvent() {
     }
     
     if (state == kDeviceStateIdle) {
+#if CONFIG_JARVIS_WAKE_ONLY_CHAT
+        {
+            auto display = Board::GetInstance().GetDisplay();
+            display->ShowNotification(Lang::Strings::WAKE_ONLY_USE_WAKE_WORD, 5000);
+        }
+        return;
+#endif
         if (!protocol_->IsAudioChannelOpened()) {
             SetDeviceState(kDeviceStateConnecting);
             // Schedule to let the state change be processed first (UI update)
@@ -788,6 +869,11 @@ void Application::HandleWakeWordDetectedEvent() {
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
 
     if (state == kDeviceStateIdle) {
+        if (voice_sleep_standby_engaged_) {
+            voice_sleep_standby_engaged_ = false;
+            Settings st("voice", true);
+            st.SetBool("sleep_standby", false);
+        }
         audio_service_.EncodeWakeWord();
         auto wake_word = audio_service_.GetLastWakeWord();
 
@@ -866,7 +952,7 @@ void Application::HandleStateChangedEvent() {
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
-            display->SetStatus(Lang::Strings::STANDBY);
+            display->SetStatus(voice_sleep_standby_engaged_ ? Lang::Strings::VOICE_SLEEP_STANDBY : Lang::Strings::STANDBY);
             display->ClearChatMessages();  // Clear messages first
             display->SetEmotion("neutral"); // Then set emotion (wechat mode checks child count)
             audio_service_.EnableVoiceProcessing(false);
@@ -904,9 +990,18 @@ void Application::HandleStateChangedEvent() {
                 play_popup_on_listening_ = false;
                 audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
             }
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+            RestartListenSilenceTimer();
+#endif
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
+
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+            if (listen_silence_timer_handle_ != nullptr) {
+                esp_timer_stop(listen_silence_timer_handle_);
+            }
+#endif
 
             if (listening_mode_ != kListeningModeRealtime) {
                 audio_service_.EnableVoiceProcessing(false);
@@ -1024,6 +1119,11 @@ void Application::WakeWordInvoke(const std::string& wake_word) {
     auto state = GetDeviceState();
     
     if (state == kDeviceStateIdle) {
+        if (voice_sleep_standby_engaged_) {
+            voice_sleep_standby_engaged_ = false;
+            Settings st("voice", true);
+            st.SetBool("sleep_standby", false);
+        }
         audio_service_.EncodeWakeWord();
 
         if (!protocol_->IsAudioChannelOpened()) {
@@ -1115,5 +1215,87 @@ void Application::ResetProtocol() {
         // Reset protocol
         protocol_.reset();
     });
+}
+
+void Application::LoadVoiceAssistState() {
+    Settings st("voice", false);
+    voice_sleep_standby_engaged_ = st.GetBool("sleep_standby", false);
+}
+
+void Application::EnterVoiceSleep() {
+    voice_sleep_standby_engaged_ = true;
+    Settings st("voice", true);
+    st.SetBool("sleep_standby", true);
+
+    ESP_LOGI(TAG, "Entering voice sleep standby (wake-only until wake phrase)");
+
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+    if (listen_silence_timer_handle_ != nullptr) {
+        esp_timer_stop(listen_silence_timer_handle_);
+    }
+#endif
+
+    DeviceState cur = GetDeviceState();
+    if (cur == kDeviceStateSpeaking) {
+        AbortSpeaking(kAbortReasonNone);
+    }
+
+    while (audio_service_.PopPacketFromSendQueue()) {
+    }
+
+    if (protocol_ && protocol_->IsAudioChannelOpened()) {
+        if (cur == kDeviceStateListening) {
+            protocol_->SendStopListening();
+        }
+        protocol_->CloseAudioChannel();
+    }
+
+    audio_service_.ResetDecoder();
+
+    Board::GetInstance().GetDisplay()->ShowNotification(Lang::Strings::VOICE_SLEEP_NOTIFY, 6000);
+
+    SetDeviceState(kDeviceStateIdle);
+}
+
+void Application::HandleSleepWordEvent() {
+    ESP_LOGI(TAG, "Sleep word detected locally");
+    EnterVoiceSleep();
+}
+
+void Application::HandleListenSilenceTimeout() {
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+    if (GetDeviceState() != kDeviceStateListening) {
+        return;
+    }
+    ESP_LOGI(TAG, "Closing session after listen silence (%ds)", CONFIG_JARVIS_SILENCE_END_SESSION_SEC);
+    if (protocol_ && protocol_->IsAudioChannelOpened()) {
+        protocol_->SendStopListening();
+        protocol_->CloseAudioChannel();
+    }
+#endif
+}
+
+void Application::RestartListenSilenceTimer() {
+#if CONFIG_JARVIS_SILENCE_END_SESSION_SEC > 0
+    if (listen_silence_timer_handle_ == nullptr) {
+        return;
+    }
+    if (GetDeviceState() != kDeviceStateListening) {
+        return;
+    }
+
+    esp_timer_stop(listen_silence_timer_handle_);
+
+    const int silence_sec = CONFIG_JARVIS_SILENCE_END_SESSION_SEC;
+    if (silence_sec <= 0) {
+        return;
+    }
+
+    if (audio_service_.IsVoiceDetected()) {
+        return;
+    }
+
+    esp_timer_start_once(listen_silence_timer_handle_, static_cast<uint64_t>(silence_sec) * 1000000ULL);
+#endif
 }
 

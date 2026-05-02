@@ -631,6 +631,23 @@ void AudioService::EnableDeviceAec(bool enable) {
 
 void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
     callbacks_ = callbacks;
+    BindWakeWordCallbacks();
+}
+
+void AudioService::BindWakeWordCallbacks() {
+    if (!wake_word_) {
+        return;
+    }
+    wake_word_->OnWakeWordDetected([this](const std::string& wake_word) {
+        if (callbacks_.on_wake_word_detected) {
+            callbacks_.on_wake_word_detected(wake_word);
+        }
+    });
+    wake_word_->SetSleepWordHandler([this](const std::string& label) {
+        if (callbacks_.on_sleep_word_detected) {
+            callbacks_.on_sleep_word_detected(label);
+        }
+    });
 }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
@@ -719,13 +736,7 @@ void AudioService::SetModelsList(srmodel_list_t* models_list) {
     }
 #endif
 
-    if (wake_word_) {
-        wake_word_->OnWakeWordDetected([this](const std::string& wake_word) {
-            if (callbacks_.on_wake_word_detected) {
-                callbacks_.on_wake_word_detected(wake_word);
-            }
-        });
-    }
+    BindWakeWordCallbacks();
 }
 
 bool AudioService::IsAfeWakeWord() {
