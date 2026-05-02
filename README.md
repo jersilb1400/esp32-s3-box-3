@@ -10,8 +10,6 @@ This repo contains ESP32-S3 ESP-BOX-3 **firmware** only. When kept inside the **
 
 Roadmaps and phased implementation notes: **`docs/plans/`**.
 
-**Jarvis HUD (BOX-3 fork):** generators and generated RGB565/mesh artefacts are consolidated under **`jarvis_hud/`** (`README.txt` there describes layout; `main/CMakeLists.txt` wires the face blob into the app build).
-
 ## Requirements
 
 - **ESP-IDF v5.5.2** (or newer 5.5.x matching the project’s `idf` component constraint). **Do NOT use ESP-IDF v6.0** — core `mqtt` was removed/reworked and CMake will fail with `unknown component mqtt`. Install per [Espressif docs](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html).
@@ -77,3 +75,4 @@ To pull fixes from upstream [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp
 git remote add upstream https://github.com/78/xiaozhi-esp32.git   # if not already added
 git fetch upstream && git merge upstream/main
 ```
+# jarvis-esp32-s3-box3
